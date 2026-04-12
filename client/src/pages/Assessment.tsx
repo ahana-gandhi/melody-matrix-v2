@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { AudioPlayer } from "@/components/AudioPlayer";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   ArrowLeft, ArrowRight, Loader2, AlertCircle, RefreshCw,
@@ -118,6 +118,7 @@ export default function Assessment() {
     currentStep, nextStep, prevStep, reset,
   } = useAssessmentStore();
 
+  const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genStatus, setGenStatus] = useState("");
   const [genProgress, setGenProgress] = useState(0);

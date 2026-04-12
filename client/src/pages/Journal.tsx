@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import type { JournalEntry, MoodSession } from "@shared/schema";
 import { BookOpen, Plus, Trash2, Music, TrendingUp, Calendar, Loader2 } from "lucide-react";
 import { Link } from "wouter";
@@ -70,6 +70,7 @@ export default function Journal() {
   const [note, setNote] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
+  const { toast } = useToast();
 
   const { data: entries = [], isLoading: entriesLoading } = useQuery<JournalEntry[]>({
     queryKey: ["/api/journal"],

@@ -3,75 +3,75 @@
 @tailwind utilities;
 
 /* ─── MelodyMatrix Design System ───────────────────────────────────────────
-   Wellness palette: warm sage greens + deep plum accent + soft cream surfaces
-   Fonts: Zodiak (display headings) + Work Sans (body)
-   Philosophy: calm, professional, trustworthy — not flashy or "AI-template"
+   Inspired by Spotify: near-black surfaces, vivid green accent, bold sans.
+   Philosophy: immersive, premium music product — not a clinical wellness app.
    ─────────────────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    /* Surfaces — warm cream */
-    --background: 42 30% 97%;
-    --foreground: 220 20% 12%;
+    /* Dark-first: light mode is inverted (off-white surfaces) */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
 
-    --card: 42 25% 99%;
-    --card-foreground: 220 20% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
 
-    --popover: 42 25% 99%;
-    --popover-foreground: 220 20% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
 
-    /* Primary: deep sage green — calming, trustworthy */
-    --primary: 158 38% 30%;
+    /* Primary: Spotify-adjacent green — energetic, distinctive */
+    --primary: 141 72% 42%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: muted plum — emotional depth without aggression */
-    --secondary: 280 25% 55%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary: elevated surface in dark mode */
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 8%;
 
-    --muted: 42 15% 93%;
-    --muted-foreground: 220 8% 46%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 158 38% 30%;
+    --accent: 141 72% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 42 12% 88%;
-    --input: 42 12% 88%;
-    --ring: 158 38% 30%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 141 72% 42%;
 
     --radius: 0.5rem;
   }
 
+  /* Dark mode — the primary experience (Spotify-style) */
   .dark {
-    --background: 220 20% 8%;
-    --foreground: 42 15% 88%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
 
-    --card: 220 18% 11%;
-    --card-foreground: 42 15% 88%;
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 220 18% 11%;
-    --popover-foreground: 42 15% 88%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 158 42% 46%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 141 72% 46%;
+    --primary-foreground: 0 0% 8%;
 
-    --secondary: 280 28% 62%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 220 15% 16%;
-    --muted-foreground: 220 8% 58%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 63%;
 
-    --accent: 158 42% 46%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 141 72% 46%;
+    --accent-foreground: 0 0% 8%;
 
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 12% 20%;
-    --input: 220 12% 20%;
-    --ring: 158 42% 46%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 141 72% 46%;
   }
 }
 
@@ -89,19 +89,19 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Work Sans', 'Helvetica Neue', sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
     font-size: 1rem;
-    line-height: 1.65;
+    line-height: 1.6;
     font-weight: 400;
-    letter-spacing: 0.01em;
     min-height: 100dvh;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Zodiak', 'Georgia', serif;
-    line-height: 1.2;
+    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+    line-height: 1.15;
     text-wrap: balance;
-    font-weight: 500;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
   p, li {
@@ -136,16 +136,27 @@
 
 @layer utilities {
   .font-display {
-    font-family: 'Zodiak', 'Georgia', serif;
+    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.03em;
   }
 
   .font-body {
-    font-family: 'Work Sans', 'Helvetica Neue', sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+  }
+
+  /* Spotify-style card hover: slight lift */
+  .card-hover {
+    transition: background-color 0.2s ease, transform 0.2s ease;
+  }
+  .card-hover:hover {
+    background-color: hsl(var(--muted));
+    transform: translateY(-2px);
   }
 
   /* Fade animations */
   @keyframes fade-in-up {
-    from { opacity: 0; transform: translateY(16px); }
+    from { opacity: 0; transform: translateY(20px); }
     to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes fade-in {
@@ -161,19 +172,24 @@
     100% { background-position: 200% 0; }
   }
   @keyframes wave-bar {
-    0%, 100% { transform: scaleY(0.4); }
+    0%, 100% { transform: scaleY(0.3); }
     50%       { transform: scaleY(1); }
   }
-  @keyframes pulse-ring {
-    0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.35); }
-    70%  { box-shadow: 0 0 0 12px hsl(var(--primary) / 0); }
+  @keyframes pulse-green {
+    0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+    70%  { box-shadow: 0 0 0 14px hsl(var(--primary) / 0); }
     100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
   }
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
 
-  .animate-fade-in-up  { animation: fade-in-up  0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .animate-fade-in     { animation: fade-in     0.3s ease both; }
+  .animate-fade-in-up  { animation: fade-in-up  0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-fade-in     { animation: fade-in     0.4s ease both; }
   .animate-scale-in    { animation: scale-in    0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .animate-pulse-ring  { animation: pulse-ring  1.8s ease-out infinite; }
+  .animate-pulse-green { animation: pulse-green 2s ease-out infinite; }
+  .animate-spin-slow   { animation: spin-slow   8s linear infinite; }
 
   /* Skeleton loader */
   .skeleton {
@@ -188,7 +204,7 @@
     border-radius: var(--radius);
   }
 
-  /* Wave bars (music visualizer fallback) */
+  /* Wave bars (music visualizer) */
   .wave-bar {
     display: inline-block;
     width: 3px;
@@ -198,16 +214,31 @@
     transform-origin: bottom;
   }
 
-  /* Crisis banner accent */
-  .crisis-banner {
-    @apply border border-destructive/30 bg-destructive/5 rounded-md p-4;
+  /* Green gradient pill badge */
+  .pill-green {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    background: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
-  /* Sage gradient (subtle, non-flashy) */
-  .bg-sage-gradient {
-    background: linear-gradient(135deg, hsl(158 38% 30%), hsl(158 28% 40%));
+  /* Section gradient — dark version */
+  .dark .section-gradient {
+    background: linear-gradient(180deg, hsl(0 0% 11%) 0%, hsl(0 0% 7%) 100%);
   }
-  .dark .bg-sage-gradient {
-    background: linear-gradient(135deg, hsl(158 42% 46%), hsl(280 28% 62%));
+  .section-gradient {
+    background: linear-gradient(180deg, hsl(0 0% 96%) 0%, hsl(0 0% 98%) 100%);
+  }
+
+  /* Green CTA button glow */
+  .btn-glow:hover {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
   }
 }
