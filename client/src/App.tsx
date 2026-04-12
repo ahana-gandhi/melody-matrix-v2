@@ -9,6 +9,8 @@ import Assessment from "@/pages/Assessment";
 import Journal from "@/pages/Journal";
 import About from "@/pages/About";
 import Privacy from "@/pages/Privacy";
+import Presets from "@/pages/Presets";
+import Guided from "@/pages/Guided";
 import NotFound from "@/pages/NotFound";
 
 export default function App() {
@@ -20,6 +22,8 @@ export default function App() {
             <Route path="/" component={Home} />
             <Route path="/assessment" component={Assessment} />
             <Route path="/journal" component={Journal} />
+            <Route path="/presets" component={Presets} />
+            <Route path="/guided" component={Guided} />
             <Route path="/about" component={About} />
             <Route path="/privacy" component={Privacy} />
             <Route component={NotFound} />
