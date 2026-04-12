@@ -165,7 +165,26 @@ export default function Assessment() {
 
       setGeneratedTrackUrl(url);
 
-      // Persist session to backend
+      // Persist session to localStorage (works on Vercel static)
+      try {
+        const LS_SESSIONS = "mm_sessions_v1";
+        const existingSessions = JSON.parse(localStorage.getItem(LS_SESSIONS) ?? "[]");
+        const newSession = {
+          id: Date.now(),
+          issue: selectedIssue,
+          instrument: selectedInstrument,
+          tempo,
+          moodBefore,
+          moodAfter: null,
+          createdAt: new Date().toISOString(),
+        };
+        // Store session id so we can update moodAfter later
+        const sessionLocalId = newSession.id;
+        setSessionId(sessionLocalId);
+        localStorage.setItem(LS_SESSIONS, JSON.stringify([newSession, ...existingSessions]));
+      } catch { /* non-critical */ }
+
+      // Also try backend (non-critical, may not be available on static deploy)
       try {
         const res = await apiRequest("POST", "/api/sessions", {
           ...(user ? { userId: user.id } : {}),
@@ -178,6 +197,7 @@ export default function Assessment() {
         });
         if (res.ok) {
           const session = await res.json();
+          // Override with backend id if available
           setSessionId(session.id);
         }
       } catch { /* non-critical */ }
@@ -249,7 +269,17 @@ export default function Assessment() {
       }
     }
 
-    // Also update the session's mood-after on the backend (non-critical)
+    // Update moodAfter in localStorage session
+    try {
+      const LS_SESSIONS = "mm_sessions_v1";
+      const sessions = JSON.parse(localStorage.getItem(LS_SESSIONS) ?? "[]");
+      const updated = sessions.map((s: any) =>
+        s.id === sessionId ? { ...s, moodAfter } : s
+      );
+      localStorage.setItem(LS_SESSIONS, JSON.stringify(updated));
+    } catch {}
+
+    // Also try backend (non-critical)
     if (sessionId) {
       try { await apiRequest("PATCH", `/api/sessions/${sessionId}/mood-after`, { moodAfter }); } catch {}
     }
