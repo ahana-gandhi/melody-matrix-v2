@@ -113,15 +113,15 @@ export default function About() {
 
       {/* ── Not a substitute ── */}
       <section className="py-8 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="flex gap-4 p-6 rounded-2xl border border-amber-500/30 bg-amber-950/20 dark:bg-amber-950/30">
-          <AlertCircle className="h-6 w-6 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="flex gap-4 p-6 rounded-2xl border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30">
+          <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-amber-200 mb-1">Not a substitute for professional mental health care</p>
-            <p className="text-sm text-amber-300/80 leading-relaxed mb-2">
+            <p className="font-bold text-amber-900 dark:text-amber-200 mb-1">Not a substitute for professional mental health care</p>
+            <p className="text-sm text-amber-800 dark:text-amber-300/80 leading-relaxed mb-2">
               Music therapy delivered by a licensed music therapist is a recognized clinical intervention. This app is not that.
               If you are experiencing significant distress, please reach out to a licensed mental health professional.
             </p>
-            <p className="text-sm font-bold text-amber-300">
+            <p className="text-sm font-bold text-amber-900 dark:text-amber-300">
               In crisis? Call or text <a href="tel:988" className="underline">988</a> (24/7). Text <strong>HOME</strong> to <strong>741741</strong>.
             </p>
           </div>
