@@ -291,9 +291,14 @@ export default function Guided() {
                 <span className="text-3xl mb-3 block">{t.icon}</span>
                 <h3 className="font-semibold text-foreground">{t.label}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">{t.subtitle}</p>
-                <p className="text-[11px] text-muted-foreground/60 mt-2">
-                  {t.instrument} · {t.tempo} BPM
-                </p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <span className="text-[11px] text-muted-foreground/60">{t.instrument} · {t.tempo} BPM</span>
+                  <span className="text-[11px] text-muted-foreground/40">·</span>
+                  <span className="text-[11px] text-muted-foreground/60">
+                    🫁 {Math.floor(t.breathDuration / 60)}
+                    {t.breathDuration % 60 > 0 ? `:${String(t.breathDuration % 60).padStart(2, "0")}` : ""} min breathing
+                  </span>
+                </div>
               </div>
               {theme?.id === t.id && (
                 <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
