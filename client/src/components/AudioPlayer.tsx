@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 interface AudioPlayerProps {
   audioUrl: string;
   trackName?: string;
+  /** If true, the track loops seamlessly — used for Guided and Assessment. */
+  loop?: boolean;
 }
 
 const WaveBars = ({ playing }: { playing: boolean }) => (
@@ -34,7 +36,7 @@ const formatTime = (t: number) => {
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
 
-export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track" }: AudioPlayerProps) {
+export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track", loop = false }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -47,7 +49,7 @@ export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track" }: 
     if (!audio) return;
     const onTime = () => setCurrentTime(audio.currentTime);
     const onMeta = () => setDuration(audio.duration);
-    const onEnd = () => setPlaying(false);
+    const onEnd = () => { if (!loop) setPlaying(false); };
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("ended", onEnd);
@@ -103,7 +105,7 @@ export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track" }: 
   return (
     <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
       <CardContent className="p-6 space-y-4">
-        <audio ref={audioRef} src={audioUrl} preload="auto" />
+        <audio ref={audioRef} src={audioUrl} preload="auto" loop={loop} />
 
         {/* Track info + visualizer */}
         <div className="flex items-center justify-between gap-4">

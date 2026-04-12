@@ -574,6 +574,7 @@ export default function Assessment() {
           <AudioPlayer
             audioUrl={generatedTrackUrl}
             trackName={`${issueTitle} · ${instrumentLabel} · ${tempo} BPM`}
+            loop
           />
         )}
 
