@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAssessmentStore } from "@/store/assessmentStore";
+import { useAuthStore } from "@/store/authStore";
 import { buildTherapeuticPrompt, type Issue, type Instrument } from "@/lib/promptBuilder";
 import { generateMusic } from "@/services/lyria";
 import { searchYouTube, type YouTubeVideo } from "@/services/youtube";
@@ -119,6 +120,7 @@ export default function Assessment() {
     currentStep, nextStep, prevStep, reset,
   } = useAssessmentStore();
 
+  const { user } = useAuthStore();
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
   const [genStatus, setGenStatus] = useState("");
@@ -166,6 +168,7 @@ export default function Assessment() {
       // Persist session to backend
       try {
         const res = await apiRequest("POST", "/api/sessions", {
+          ...(user ? { userId: user.id } : {}),
           issue: selectedIssue,
           instrument: selectedInstrument,
           tempo,
@@ -207,26 +210,46 @@ export default function Assessment() {
   };
 
   const handleSaveMoodAfter = async () => {
-    // Save mood-after entry to localStorage journal
-    try {
-      const LS_JOURNAL = "mm_journal_v1";
-      const existing = JSON.parse(localStorage.getItem(LS_JOURNAL) ?? "[]");
-      const newEntry = {
-        id: Date.now(),
-        mood: moodAfter,
-        energy: 3,
-        note: selectedIssue
-          ? `After ${selectedIssue} session — ${selectedInstrument ?? ""} at ${tempo} BPM`
-          : "Music session",
-        tags: JSON.stringify(["music-session", selectedIssue ?? ""].filter(Boolean)),
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem(LS_JOURNAL, JSON.stringify([newEntry, ...existing]));
-      toast({ title: "Saved to Journal ✓", description: `Mood after: ${moodAfter}/5` });
-    } catch {
-      toast({ title: "Could not save", variant: "destructive" });
+    const note = selectedIssue
+      ? `After ${selectedIssue} session — ${selectedInstrument ?? ""} at ${tempo} BPM`
+      : "Music session";
+    const tags = JSON.stringify(["music-session", selectedIssue ?? ""].filter(Boolean));
+
+    if (user) {
+      // Save to backend when logged in
+      try {
+        await apiRequest("POST", "/api/journal", {
+          userId: user.id,
+          mood: moodAfter,
+          energy: 3,
+          note,
+          tags,
+        });
+        toast({ title: "Saved to Journal ✓", description: `Mood after: ${moodAfter}/5 · synced to account` });
+      } catch {
+        toast({ title: "Could not save", variant: "destructive" });
+      }
+    } else {
+      // Local-only fallback
+      try {
+        const LS_JOURNAL = "mm_journal_v1";
+        const existing = JSON.parse(localStorage.getItem(LS_JOURNAL) ?? "[]");
+        const newEntry = {
+          id: Date.now(),
+          mood: moodAfter,
+          energy: 3,
+          note,
+          tags,
+          createdAt: new Date().toISOString(),
+        };
+        localStorage.setItem(LS_JOURNAL, JSON.stringify([newEntry, ...existing]));
+        toast({ title: "Saved to Journal ✓", description: `Mood after: ${moodAfter}/5` });
+      } catch {
+        toast({ title: "Could not save", variant: "destructive" });
+      }
     }
-    // Also try the backend (non-critical)
+
+    // Also update the session's mood-after on the backend (non-critical)
     if (sessionId) {
       try { await apiRequest("PATCH", `/api/sessions/${sessionId}/mood-after`, { moodAfter }); } catch {}
     }

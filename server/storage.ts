@@ -9,7 +9,7 @@ import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Users
-  getUserByEmail(email: string): User | undefined;
+  getUserByUsername(username: string): User | undefined;
   getUserById(id: number): User | undefined;
   createUser(user: InsertUser): User;
 
@@ -26,8 +26,8 @@ export interface IStorage {
 
 export const storage: IStorage = {
   // ── Users ──────────────────────────────────────────────────────────────
-  getUserByEmail(email) {
-    return db.select().from(users).where(eq(users.email, email)).get();
+  getUserByUsername(username) {
+    return db.select().from(users).where(eq(users.username, username)).get();
   },
   getUserById(id) {
     return db.select().from(users).where(eq(users.id, id)).get();

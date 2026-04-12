@@ -1,12 +1,13 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // ── Users ──────────────────────────────────────────────────────────────────
+// Anonymous accounts: no email, just a generated username + passphrase.
+// Users write down or screenshot their credentials — we never collect PII.
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  username: text("username").notNull().unique(),   // e.g. "calm-river-4821"
   passwordHash: text("password_hash").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .$defaultFn(() => new Date())
@@ -21,18 +22,17 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // ── Mood Sessions ──────────────────────────────────────────────────────────
-// Each time the user completes the assessment and generates music
 export const moodSessions = sqliteTable("mood_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id"), // nullable — supports anonymous use
-  issue: text("issue").notNull(), // anxiety | depression | relationship | stress | sleep
+  userId: integer("user_id"),
+  issue: text("issue").notNull(),
   instrument: text("instrument").notNull(),
   tempo: integer("tempo").notNull(),
-  intensityScores: text("intensity_scores").notNull(), // JSON
+  intensityScores: text("intensity_scores").notNull(),
   promptUsed: text("prompt_used").notNull(),
-  moodBefore: integer("mood_before"), // 1-5 self-rated mood before
-  moodAfter: integer("mood_after"),   // 1-5 self-rated mood after
-  notes: text("notes"),               // free-text journal note
+  moodBefore: integer("mood_before"),
+  moodAfter: integer("mood_after"),
+  notes: text("notes"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .$defaultFn(() => new Date())
     .notNull(),
@@ -46,14 +46,13 @@ export type InsertMoodSession = z.infer<typeof insertMoodSessionSchema>;
 export type MoodSession = typeof moodSessions.$inferSelect;
 
 // ── Journal Entries ────────────────────────────────────────────────────────
-// Lightweight daily check-ins independent of sessions
 export const journalEntries = sqliteTable("journal_entries", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),
-  mood: integer("mood").notNull(), // 1-5
-  energy: integer("energy").notNull(), // 1-5
+  mood: integer("mood").notNull(),
+  energy: integer("energy").notNull(),
   note: text("note"),
-  tags: text("tags"), // JSON array of strings e.g. ["anxious","tired"]
+  tags: text("tags"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .$defaultFn(() => new Date())
     .notNull(),
