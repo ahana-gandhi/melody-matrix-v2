@@ -12,11 +12,16 @@ sqlite.pragma("journal_mode = WAL");
 export const db = drizzle(sqlite, { schema });
 
 // Run migrations inline (create tables if they don't exist)
+// Drop old users table if it has the legacy email schema
+const cols = sqlite.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+if (cols.length > 0 && !cols.find(c => c.name === "username")) {
+  sqlite.exec("DROP TABLE IF EXISTS users;");
+}
+
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
