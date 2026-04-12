@@ -24,7 +24,6 @@ export interface ComposeRequest {
   tempo?: number;
 }
 
-/** API key — passed at call time (from browser localStorage) or from build-time env */
 const BUILD_TIME_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
 const LYRIA_MODEL = "models/lyria-realtime-exp";
@@ -107,12 +106,11 @@ const safeStop = (s?: LiveMusicSession) => {
 
 export const generateMusic = async (
   request: ComposeRequest,
-  onProgress?: ProgressCallback,
-  runtimeApiKey?: string
+  onProgress?: ProgressCallback
 ): Promise<string> => {
-  const GEMINI_API_KEY = runtimeApiKey || BUILD_TIME_KEY;
+  const GEMINI_API_KEY = BUILD_TIME_KEY;
   if (!GEMINI_API_KEY) {
-    throw new Error("__KEY_MISSING__");
+    throw new Error("Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file and rebuild.");
   }
 
   const prompt = request.prompt.trim();
