@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { AudioPlayer } from "@/components/AudioPlayer";
+import { BreathingExercise } from "@/components/BreathingExercise";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -206,11 +207,28 @@ export default function Assessment() {
   };
 
   const handleSaveMoodAfter = async () => {
+    // Save mood-after entry to localStorage journal
+    try {
+      const LS_JOURNAL = "mm_journal_v1";
+      const existing = JSON.parse(localStorage.getItem(LS_JOURNAL) ?? "[]");
+      const newEntry = {
+        id: Date.now(),
+        mood: moodAfter,
+        energy: 3,
+        note: selectedIssue
+          ? `After ${selectedIssue} session — ${selectedInstrument ?? ""} at ${tempo} BPM`
+          : "Music session",
+        tags: JSON.stringify(["music-session", selectedIssue ?? ""].filter(Boolean)),
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem(LS_JOURNAL, JSON.stringify([newEntry, ...existing]));
+      toast({ title: "Saved to Journal ✓", description: `Mood after: ${moodAfter}/5` });
+    } catch {
+      toast({ title: "Could not save", variant: "destructive" });
+    }
+    // Also try the backend (non-critical)
     if (sessionId) {
-      try {
-        await apiRequest("PATCH", `/api/sessions/${sessionId}/mood-after`, { moodAfter });
-        toast({ title: "Mood rating saved to your journal" });
-      } catch { /* non-critical */ }
+      try { await apiRequest("PATCH", `/api/sessions/${sessionId}/mood-after`, { moodAfter }); } catch {}
     }
   };
 
@@ -439,18 +457,12 @@ export default function Assessment() {
           )}
         </div>
 
-        {/* Generation status */}
+        {/* Breathing exercise + generation status */}
         {generating && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <p className="text-sm font-medium text-foreground">{genStatus}</p>
-              </div>
-              <Progress value={genProgress} className="h-1.5" />
-              <p className="text-xs text-muted-foreground">
-                Lyria is streaming a ~28 second therapeutic composition in real time...
-              </p>
+              <BreathingExercise issue={selectedIssue ?? undefined} active={generating} />
+              <Progress value={genProgress} className="h-1" />
             </CardContent>
           </Card>
         )}
