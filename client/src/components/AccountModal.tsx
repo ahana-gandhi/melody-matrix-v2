@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, useAuthStore as authStoreRef } from "@/store/authStore";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -12,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Copy, Check, ShieldCheck, LogOut, Loader2, Eye, EyeOff, KeyRound, UserRound,
+  Copy, Check, ShieldCheck, LogOut, Loader2, Eye, EyeOff,
+  KeyRound, UserRound, Sparkles, PenLine,
 } from "lucide-react";
 
-// ── Shared sub-components ─────────────────────────────────────────────────────
+// ── Shared ────────────────────────────────────────────────────────────────────
 
 function PrivacyNote() {
   return (
@@ -23,7 +25,7 @@ function PrivacyNote() {
       <ShieldCheck className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
       <span>
         <strong className="text-foreground">No email. No tracking.</strong>{" "}
-        Your account is identified only by a generated username and passphrase. Write them down — we can't recover lost credentials.
+        Write down your credentials — we can't recover them if lost.
       </span>
     </div>
   );
@@ -31,31 +33,17 @@ function PrivacyNote() {
 
 function CopyableField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
   };
-
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Label>
+      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <code className="flex-1 rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
+        <code className="flex-1 rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-sm text-foreground break-all">
           {value}
         </code>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-foreground"
-          onClick={handleCopy}
-          aria-label={`Copy ${label}`}
-        >
+        <Button size="icon" variant="ghost" className="h-9 w-9 flex-shrink-0" onClick={handleCopy} aria-label={`Copy ${label}`}>
           {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
         </Button>
       </div>
@@ -66,17 +54,26 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 // ── Create Account tab ────────────────────────────────────────────────────────
 
 function CreateAccountTab({ onDone }: { onDone: () => void }) {
-  const { register } = useAuthStore();
+  const { register, login } = useAuthStore();
   const { toast } = useToast();
+
+  // Mode: "choose" | "generate" | "custom" | "done"
+  const [mode, setMode] = useState<"choose" | "generate" | "custom" | "done">("choose");
   const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
-  const handleCreate = async () => {
+  // Custom form state
+  const [customUsername, setCustomUsername] = useState("");
+  const [customPassword, setCustomPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+
+  const handleGenerate = async () => {
     setLoading(true);
     try {
       const creds = await register();
       setCredentials(creds);
+      setMode("done");
     } catch (e: any) {
       toast({ title: "Could not create account", description: e.message, variant: "destructive" });
     } finally {
@@ -84,65 +81,159 @@ function CreateAccountTab({ onDone }: { onDone: () => void }) {
     }
   };
 
-  if (credentials) {
+  const handleCustomCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customUsername.trim().length < 3) {
+      toast({ title: "Username must be at least 3 characters", variant: "destructive" }); return;
+    }
+    if (customPassword.trim().length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" }); return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/register", {
+        username: customUsername.trim(),
+        password: customPassword.trim(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Registration failed" }));
+        throw new Error(err.error || "Registration failed");
+      }
+      const { user } = await res.json();
+      authStoreRef.setState({ user });
+      try { localStorage.setItem("mm_auth_v1", JSON.stringify(user)); } catch {}
+      toast({ title: "Account created" });
+      onDone();
+    } catch (e: any) {
+      toast({ title: "Could not create account", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Choose mode ──
+  if (mode === "choose") {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          How would you like to set up your account? No email required either way.
+        </p>
+        <PrivacyNote />
+        <div className="grid grid-cols-1 gap-3 pt-1">
+          <button
+            onClick={() => setMode("generate")}
+            className="flex items-start gap-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-primary/5 p-4 text-left transition-all"
+          >
+            <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-foreground text-sm">Generate for me</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Get a random username + passphrase. Maximum privacy.</p>
+            </div>
+          </button>
+          <button
+            onClick={() => setMode("custom")}
+            className="flex items-start gap-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-primary/5 p-4 text-left transition-all"
+          >
+            <PenLine className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-foreground text-sm">Choose my own</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Pick a username and password you'll remember.</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Generate mode ──
+  if (mode === "generate") {
+    if (credentials) {
+      return (
+        <div className="space-y-5">
+          <div className="text-center space-y-1">
+            <p className="text-sm font-semibold text-foreground">Your account is ready</p>
+            <p className="text-xs text-muted-foreground">Save these — this is the only time you'll see them.</p>
+          </div>
+          <CopyableField label="Username" value={credentials.username} />
+          <CopyableField label="Passphrase" value={credentials.password} />
+          <PrivacyNote />
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input type="checkbox" className="h-4 w-4 rounded accent-primary" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />
+            <span className="text-sm text-foreground">I've saved my username and passphrase</span>
+          </label>
+          <Button onClick={onDone} disabled={!confirmed} className="w-full rounded-full font-semibold">
+            Done — Start Using MelodyMatrix
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="space-y-5">
-        <div className="text-center space-y-1">
-          <p className="text-sm font-semibold text-foreground">Your account is ready</p>
-          <p className="text-xs text-muted-foreground">
-            Save these credentials somewhere safe — this is the only time you'll see them.
-          </p>
-        </div>
-
-        <CopyableField label="Username" value={credentials.username} />
-        <CopyableField label="Passphrase" value={credentials.password} />
-
+        <button onClick={() => setMode("choose")} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          ← Back
+        </button>
+        <p className="text-sm text-muted-foreground">We'll generate a random username and passphrase. Write them down — we can't recover them.</p>
         <PrivacyNote />
-
-        <label className="flex items-center gap-2.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded accent-primary"
-            checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
-          />
-          <span className="text-sm text-foreground">
-            I've saved my username and passphrase
-          </span>
-        </label>
-
-        <Button
-          onClick={onDone}
-          disabled={!confirmed}
-          className="w-full rounded-full font-semibold"
-        >
-          Done — Start Using MelodyMatrix
+        <Button onClick={handleGenerate} disabled={loading} className="w-full rounded-full font-semibold gap-2">
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating…</> : <><Sparkles className="h-4 w-4" /> Generate My Account</>}
         </Button>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <p className="text-sm text-muted-foreground leading-relaxed">
-        We'll generate a random username and passphrase for you. No email, no personal info — just a private key to your data.
-      </p>
+  // ── Custom mode ──
+  if (mode === "custom") {
+    return (
+      <form onSubmit={handleCustomCreate} className="space-y-5">
+        <button type="button" onClick={() => setMode("choose")} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          ← Back
+        </button>
+        <div className="space-y-2">
+          <Label htmlFor="custom-username" className="text-sm font-medium">Username</Label>
+          <div className="relative">
+            <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="custom-username"
+              data-testid="input-custom-username"
+              value={customUsername}
+              onChange={e => setCustomUsername(e.target.value)}
+              placeholder="your-username"
+              className="pl-9"
+              autoComplete="username"
+              minLength={3}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">At least 3 characters. No email needed.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="custom-password" className="text-sm font-medium">Password</Label>
+          <div className="relative">
+            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="custom-password"
+              data-testid="input-custom-password"
+              type={showPass ? "text" : "password"}
+              value={customPassword}
+              onChange={e => setCustomPassword(e.target.value)}
+              placeholder="min 6 characters"
+              className="pl-9 pr-10"
+              autoComplete="new-password"
+              minLength={6}
+            />
+            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPass(s => !s)}>
+              {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        <PrivacyNote />
+        <Button type="submit" disabled={loading} className="w-full rounded-full font-semibold gap-2">
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating…</> : "Create Account"}
+        </Button>
+      </form>
+    );
+  }
 
-      <PrivacyNote />
-
-      <Button
-        onClick={handleCreate}
-        disabled={loading}
-        className="w-full rounded-full font-semibold gap-2"
-      >
-        {loading ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /> Creating account…</>
-        ) : (
-          <><KeyRound className="h-4 w-4" /> Generate My Account</>
-        )}
-      </Button>
-    </div>
-  );
+  return null;
 }
 
 // ── Sign In tab ───────────────────────────────────────────────────────────────
@@ -172,32 +263,24 @@ function SignInTab({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={handleLogin} className="space-y-5">
-      <p className="text-sm text-muted-foreground">
-        Enter the username and passphrase you wrote down when creating your account.
-      </p>
-
+      <p className="text-sm text-muted-foreground">Enter the username and password you saved when creating your account.</p>
       <div className="space-y-2">
-        <Label htmlFor="signin-username" className="text-sm font-medium">
-          Username
-        </Label>
+        <Label htmlFor="signin-username" className="text-sm font-medium">Username</Label>
         <div className="relative">
           <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="signin-username"
             data-testid="input-username"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="calm-river-4821"
-            className="pl-9 font-mono"
+            onChange={e => setUsername(e.target.value)}
+            placeholder="your-username"
+            className="pl-9"
             autoComplete="username"
           />
         </div>
       </div>
-
       <div className="space-y-2">
-        <Label htmlFor="signin-password" className="text-sm font-medium">
-          Passphrase
-        </Label>
+        <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
         <div className="relative">
           <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -205,33 +288,18 @@ function SignInTab({ onDone }: { onDone: () => void }) {
             data-testid="input-password"
             type={showPass ? "text" : "password"}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="apple-bridge-zenith"
-            className="pl-9 pr-10 font-mono"
+            onChange={e => setPassword(e.target.value)}
+            placeholder="your password or passphrase"
+            className="pl-9 pr-10"
             autoComplete="current-password"
           />
-          <button
-            type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            onClick={() => setShowPass((s) => !s)}
-            aria-label={showPass ? "Hide passphrase" : "Show passphrase"}
-          >
+          <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPass(s => !s)}>
             {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
       </div>
-
-      <Button
-        type="submit"
-        disabled={loading || !username.trim() || !password.trim()}
-        className="w-full rounded-full font-semibold gap-2"
-        data-testid="button-signin"
-      >
-        {loading ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</>
-        ) : (
-          "Sign In"
-        )}
+      <Button type="submit" disabled={loading || !username.trim() || !password.trim()} className="w-full rounded-full font-semibold gap-2" data-testid="button-signin">
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</> : "Sign In"}
       </Button>
     </form>
   );
@@ -242,12 +310,7 @@ function SignInTab({ onDone }: { onDone: () => void }) {
 function SignedInView({ onClose }: { onClose: () => void }) {
   const { user, logout } = useAuthStore();
   const { toast } = useToast();
-
-  const handleLogout = () => {
-    logout();
-    toast({ title: "Signed out" });
-    onClose();
-  };
+  const handleLogout = () => { logout(); toast({ title: "Signed out" }); onClose(); };
 
   return (
     <div className="space-y-6">
@@ -257,24 +320,13 @@ function SignedInView({ onClose }: { onClose: () => void }) {
         </div>
         <div className="min-w-0">
           <p className="font-semibold text-foreground truncate">{user?.username}</p>
-          <p className="text-xs text-muted-foreground">Signed in · Your data syncs to this account</p>
+          <p className="text-xs text-muted-foreground">Signed in · data syncs to this account</p>
         </div>
       </div>
-
       <PrivacyNote />
-
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Account options</p>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
-          onClick={handleLogout}
-          data-testid="button-logout"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Button>
-      </div>
+      <Button variant="outline" className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleLogout} data-testid="button-logout">
+        <LogOut className="h-4 w-4" /> Sign out
+      </Button>
     </div>
   );
 }
@@ -293,22 +345,15 @@ export function AccountModal({ open, onOpenChange }: AccountModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="font-bold text-lg">
-            {user ? "Your Account" : "Account"}
-          </DialogTitle>
+          <DialogTitle className="font-bold text-lg">{user ? "Your Account" : "Account"}</DialogTitle>
         </DialogHeader>
-
         {user ? (
           <SignedInView onClose={() => onOpenChange(false)} />
         ) : (
           <Tabs defaultValue="create" className="mt-1">
             <TabsList className="w-full mb-5 bg-muted/50">
-              <TabsTrigger value="create" className="flex-1 text-sm" data-testid="tab-create">
-                Create Account
-              </TabsTrigger>
-              <TabsTrigger value="signin" className="flex-1 text-sm" data-testid="tab-signin">
-                Sign In
-              </TabsTrigger>
+              <TabsTrigger value="create" className="flex-1 text-sm" data-testid="tab-create">Create Account</TabsTrigger>
+              <TabsTrigger value="signin" className="flex-1 text-sm" data-testid="tab-signin">Sign In</TabsTrigger>
             </TabsList>
             <TabsContent value="create">
               <CreateAccountTab onDone={() => onOpenChange(false)} />
