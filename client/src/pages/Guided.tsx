@@ -420,6 +420,7 @@ export default function Guided() {
               <AudioPlayer
                 audioUrl={trackUrl}
                 trackName={`${theme.label} · ${theme.instrument} · ${theme.tempo} BPM`}
+                loop
               />
               <Button
                 onClick={() => setStep("reflect")}

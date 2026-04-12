@@ -132,15 +132,24 @@ const CATEGORIES = ["Sleep", "Anxiety", "Stress", "Focus", "Mood", "Relationship
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
+// Duration options for Presets — user picks before generating
+const DURATION_OPTIONS = [
+  { label: "30s",  ms: 30_000,  waitLabel: "~30s wait" },
+  { label: "1 min", ms: 60_000,  waitLabel: "~1 min wait" },
+  { label: "90s",  ms: 90_000,  waitLabel: "~1.5 min wait" },
+];
+const DEFAULT_DURATION_MS = 30_000;
+
 export default function Presets() {
   const { toast } = useToast();
-  const [activePreset, setActivePreset] = useState<Preset | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState(0);
-  const [trackUrl, setTrackUrl] = useState<string | null>(null);
+  const [activePreset, setActivePreset]     = useState<Preset | null>(null);
+  const [generating, setGenerating]         = useState(false);
+  const [genProgress, setGenProgress]       = useState(0);
+  const [trackUrl, setTrackUrl]             = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [clipDurationMs, setClipDurationMs] = useState(DEFAULT_DURATION_MS);
 
-  const handleGenerate = async (preset: Preset) => {
+  const handleGenerate = async (preset: Preset, durationMs = clipDurationMs) => {
     setActivePreset(preset);
     setTrackUrl(null);
     setGenerating(true);
@@ -148,7 +157,7 @@ export default function Presets() {
 
     try {
       const url = await generateMusic(
-        { prompt: preset.prompt, instrument: preset.instrument, tempo: preset.tempo },
+        { prompt: preset.prompt, instrument: preset.instrument, tempo: preset.tempo, clipDurationMs: durationMs },
         (_status, pct) => setGenProgress(pct),
       );
       setTrackUrl(url);
@@ -174,6 +183,7 @@ export default function Presets() {
   // ── Player view ─────────────────────────────────────────────────────────────
 
   if (activePreset) {
+    const selectedDuration = DURATION_OPTIONS.find(d => d.ms === clipDurationMs) ?? DURATION_OPTIONS[0];
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         <button onClick={handleBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -191,6 +201,32 @@ export default function Presets() {
           </div>
         </div>
 
+        {/* Duration picker — only shown when not generating and no track yet */}
+        {!generating && !trackUrl && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground text-center">Clip length</p>
+            <div className="flex justify-center gap-2">
+              {DURATION_OPTIONS.map(opt => (
+                <button
+                  key={opt.ms}
+                  onClick={() => setClipDurationMs(opt.ms)}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                    clipDurationMs === opt.ms
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                  <span className="block text-[10px] font-normal opacity-60">{opt.waitLabel}</span>
+                </button>
+              ))}
+            </div>
+            <Button onClick={() => handleGenerate(activePreset)} className="w-full gap-2 rounded-full font-bold" size="lg">
+              <Sparkles className="h-4 w-4" /> Generate {selectedDuration.label} Track
+            </Button>
+          </div>
+        )}
+
         {generating && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-5 space-y-3">
@@ -201,13 +237,28 @@ export default function Presets() {
         )}
 
         {trackUrl && (
-          <AudioPlayer audioUrl={trackUrl} trackName={`${activePreset.name} · ${activePreset.instrument} · ${activePreset.tempo} BPM`} />
-        )}
-
-        {!generating && !trackUrl && (
-          <Button onClick={() => handleGenerate(activePreset)} className="w-full gap-2 rounded-full font-bold" size="lg">
-            <Sparkles className="h-4 w-4" /> Generate Again
-          </Button>
+          <div className="space-y-4">
+            <AudioPlayer audioUrl={trackUrl} trackName={`${activePreset.name} · ${activePreset.instrument} · ${activePreset.tempo} BPM`} />
+            {/* Regenerate with different duration */}
+            <div className="flex justify-center gap-2">
+              {DURATION_OPTIONS.map(opt => (
+                <button
+                  key={opt.ms}
+                  onClick={() => { setTrackUrl(null); setClipDurationMs(opt.ms); }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    clipDurationMs === opt.ms
+                      ? "bg-primary/20 text-primary border-primary/40"
+                      : "border-border text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <Button onClick={() => handleGenerate(activePreset)} variant="outline" className="w-full gap-2 rounded-full">
+              <Sparkles className="h-4 w-4" /> Generate Again
+            </Button>
+          </div>
         )}
       </div>
     );
@@ -252,7 +303,7 @@ export default function Presets() {
         {filteredPresets.map(preset => (
           <button
             key={preset.id}
-            onClick={() => handleGenerate(preset)}
+            onClick={() => { setClipDurationMs(DEFAULT_DURATION_MS); setTrackUrl(null); setActivePreset(preset); }}
             disabled={generating}
             data-testid={`preset-${preset.id}`}
             className="text-left group rounded-lg border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all p-5 space-y-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
