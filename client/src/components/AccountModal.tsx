@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useAuthStore, useAuthStore as authStoreRef } from "@/store/authStore";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -24,8 +23,8 @@ function PrivacyNote() {
     <div className="flex items-start gap-2.5 rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
       <ShieldCheck className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
       <span>
-        <strong className="text-foreground">No email. No tracking.</strong>{" "}
-        Write down your credentials — we can't recover them if lost.
+        <strong className="text-foreground">No email. No server. No tracking.</strong>{" "}
+        Your account lives in this browser only. Write down your credentials — they can't be recovered.
       </span>
     </div>
   );
@@ -54,7 +53,7 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 // ── Create Account tab ────────────────────────────────────────────────────────
 
 function CreateAccountTab({ onDone }: { onDone: () => void }) {
-  const { register, login } = useAuthStore();
+  const { register, registerCustom } = useAuthStore();
   const { toast } = useToast();
 
   // Mode: "choose" | "generate" | "custom" | "done"
@@ -83,25 +82,9 @@ function CreateAccountTab({ onDone }: { onDone: () => void }) {
 
   const handleCustomCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (customUsername.trim().length < 3) {
-      toast({ title: "Username must be at least 3 characters", variant: "destructive" }); return;
-    }
-    if (customPassword.trim().length < 6) {
-      toast({ title: "Password must be at least 6 characters", variant: "destructive" }); return;
-    }
     setLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/register", {
-        username: customUsername.trim(),
-        password: customPassword.trim(),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Registration failed" }));
-        throw new Error(err.error || "Registration failed");
-      }
-      const { user } = await res.json();
-      authStoreRef.setState({ user });
-      try { localStorage.setItem("mm_auth_v1", JSON.stringify(user)); } catch {}
+      await registerCustom(customUsername, customPassword);
       toast({ title: "Account created" });
       onDone();
     } catch (e: any) {
@@ -320,7 +303,7 @@ function SignedInView({ onClose }: { onClose: () => void }) {
         </div>
         <div className="min-w-0">
           <p className="font-semibold text-foreground truncate">{user?.username}</p>
-          <p className="text-xs text-muted-foreground">Signed in · data syncs to this account</p>
+          <p className="text-xs text-muted-foreground">Signed in · data saved in this browser</p>
         </div>
       </div>
       <PrivacyNote />

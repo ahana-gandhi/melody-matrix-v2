@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   BookOpen, Plus, Trash2, Music, TrendingUp, Calendar,
-  Loader2, Flame, Brain, BarChart3, Sparkles, ArrowUp, ArrowDown, Minus,
+  Flame, Brain, BarChart3, Sparkles, ArrowUp, ArrowDown, Minus,
 } from "lucide-react";
 import { Link } from "wouter";
 
