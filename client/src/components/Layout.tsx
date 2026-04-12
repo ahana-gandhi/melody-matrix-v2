@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Music, BookOpen, Info, Moon, Sun, Menu, X, AlertCircle } from "lucide-react";
+import { Moon, Sun, Menu, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -13,7 +13,7 @@ const navLinks = [
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() =>
-    window.matchMedia("(prefers-color-scheme: dark)").matches
+    document.documentElement.classList.contains("dark")
   );
 
   useEffect(() => {
@@ -26,7 +26,7 @@ function ThemeToggle() {
       size="icon"
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={() => setDark((d) => !d)}
-      className="h-9 w-9"
+      className="h-9 w-9 text-muted-foreground hover:text-foreground"
     >
       {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
@@ -37,18 +37,20 @@ function CrisisBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-    <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 px-4 py-2 text-center text-sm text-amber-900 dark:text-amber-200 flex items-center justify-center gap-2">
-      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+    <div className="bg-amber-950/60 dark:bg-amber-950/60 border-b border-amber-800/50 px-4 py-2 text-center text-xs text-amber-200 flex items-center justify-center gap-2">
+      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
       <span>
-        This app is <strong>not a substitute</strong> for professional mental health care.
-        In crisis? Call or text <a href="tel:988" className="font-bold underline">988</a> (Suicide &amp; Crisis Lifeline) or text <strong>HOME</strong> to <strong>741741</strong>.
+        Not a substitute for professional mental health care.
+        In crisis? Call or text{" "}
+        <a href="tel:988" className="font-bold underline text-amber-300">988</a>{" "}
+        or text <strong>HOME</strong> to <strong>741741</strong>.
       </span>
       <button
         onClick={() => setDismissed(true)}
-        className="ml-2 text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 flex-shrink-0"
+        className="ml-2 text-amber-500 hover:text-amber-200 flex-shrink-0"
         aria-label="Dismiss banner"
       >
-        <X className="h-4 w-4" />
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -63,21 +65,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Crisis banner */}
       <CrisisBanner />
 
-      {/* Nav */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
-        <nav className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      {/* Nav — Spotify-style: dark, no border, backdrop blur */}
+      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border/50">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 font-display font-medium text-lg text-foreground hover:text-primary transition-colors">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-label="MelodyMatrix" className="flex-shrink-0">
-              <rect x="2" y="2" width="24" height="24" rx="6" fill="hsl(var(--primary))" opacity="0.15"/>
-              <rect x="2" y="2" width="24" height="24" rx="6" stroke="hsl(var(--primary))" strokeWidth="1.5"/>
-              {/* Sound wave bars */}
-              <rect x="7" y="12" width="2.5" height="4" rx="1.25" fill="hsl(var(--primary))"/>
-              <rect x="11" y="9" width="2.5" height="10" rx="1.25" fill="hsl(var(--primary))"/>
-              <rect x="15" y="7" width="2.5" height="14" rx="1.25" fill="hsl(var(--primary))"/>
-              <rect x="19" y="11" width="2.5" height="6" rx="1.25" fill="hsl(var(--primary))"/>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="MelodyMatrix" className="flex-shrink-0">
+              <circle cx="16" cy="16" r="16" fill="hsl(var(--primary))"/>
+              {/* Sound wave bars — centered */}
+              <rect x="8"  y="14" width="3" height="4"  rx="1.5" fill="hsl(var(--primary-foreground))"/>
+              <rect x="13" y="10" width="3" height="12" rx="1.5" fill="hsl(var(--primary-foreground))"/>
+              <rect x="18" y="8"  width="3" height="16" rx="1.5" fill="hsl(var(--primary-foreground))"/>
+              <rect x="23" y="12" width="3" height="8"  rx="1.5" fill="hsl(var(--primary-foreground))"/>
             </svg>
-            MelodyMatrix
+            <span className="font-bold text-lg tracking-tight text-foreground group-hover:text-primary transition-colors">
+              MelodyMatrix
+            </span>
           </Link>
 
           {/* Desktop nav */}
@@ -86,16 +89,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
                   location === link.href
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {link.label}
               </Link>
             ))}
-            <div className="ml-2">
+            <div className="ml-3 pl-3 border-l border-border">
               <ThemeToggle />
             </div>
           </div>
@@ -109,16 +112,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-64">
-                <div className="flex flex-col gap-1 mt-6">
+              <SheetContent side="right" className="w-64 bg-card">
+                <div className="flex flex-col gap-1 mt-8">
                   {navLinks.map((link) => (
                     <Link
                       key={link.href}
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      className={`px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
                         location === link.href
-                          ? "bg-primary/10 text-primary"
+                          ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
@@ -136,22 +139,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-muted/30 py-8 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Music className="h-4 w-4" />
-            <span>MelodyMatrix — AI Music for Mental Wellness</span>
+      <footer className="border-t border-border/50 bg-card py-10 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden className="flex-shrink-0">
+                <circle cx="16" cy="16" r="16" fill="hsl(var(--primary))"/>
+                <rect x="8"  y="14" width="3" height="4"  rx="1.5" fill="hsl(var(--primary-foreground))"/>
+                <rect x="13" y="10" width="3" height="12" rx="1.5" fill="hsl(var(--primary-foreground))"/>
+                <rect x="18" y="8"  width="3" height="16" rx="1.5" fill="hsl(var(--primary-foreground))"/>
+                <rect x="23" y="12" width="3" height="8"  rx="1.5" fill="hsl(var(--primary-foreground))"/>
+              </svg>
+              <span className="font-bold text-foreground">MelodyMatrix</span>
+            </div>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              AI-powered music for mental wellness. Not a substitute for professional care.
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
-            <Link href="/about" className="hover:text-foreground transition-colors">About &amp; Ethics</Link>
-            <a href="tel:988" className="hover:text-foreground transition-colors font-medium">Crisis: 988</a>
+          <div className="flex flex-col sm:items-end gap-2 text-sm">
+            <div className="flex items-center gap-4 text-muted-foreground">
+              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+              <Link href="/about" className="hover:text-foreground transition-colors">About &amp; Ethics</Link>
+              <a href="tel:988" className="hover:text-foreground transition-colors font-semibold text-primary">Crisis: 988</a>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Powered by Google Lyria AI · Built with care
+            </p>
           </div>
-          <p className="text-xs text-center sm:text-right">
-            Not a substitute for professional mental health care.
-            <br />
-            AI-generated music powered by Google Lyria.
-          </p>
         </div>
       </footer>
     </div>
