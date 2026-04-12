@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Plus, Trash2, Music, TrendingUp, Calendar, Loader2 } from "lucide-react";
+import { BookOpen, Plus, Trash2, Music, TrendingUp, Calendar, Loader2, CloudOff, Cloud } from "lucide-react";
 import { Link } from "wouter";
+import { useAuthStore } from "@/store/authStore";
+import { apiRequest } from "@/lib/queryClient";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,6 +19,7 @@ interface LocalJournalEntry {
   note: string | null;
   tags: string;
   createdAt: string;
+  _source?: "local" | "cloud";
 }
 
 interface LocalMoodSession {
@@ -29,19 +32,19 @@ interface LocalMoodSession {
   createdAt: string;
 }
 
-// ── Local storage helpers (with graceful fallback) ─────────────────────────
+// ── Local storage helpers ─────────────────────────────────────────────────────
 
 const LS_JOURNAL = "mm_journal_v1";
 const LS_SESSIONS = "mm_sessions_v1";
 
-function loadEntries(): LocalJournalEntry[] {
+function loadLocalEntries(): LocalJournalEntry[] {
   try {
     const raw = localStorage.getItem(LS_JOURNAL);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
-function saveEntries(entries: LocalJournalEntry[]) {
+function saveLocalEntries(entries: LocalJournalEntry[]) {
   try { localStorage.setItem(LS_JOURNAL, JSON.stringify(entries)); } catch {}
 }
 
@@ -108,6 +111,7 @@ function MoodChart({ sessions }: { sessions: LocalMoodSession[] }) {
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function Journal() {
+  const { user } = useAuthStore();
   const [entries, setEntries] = useState<LocalJournalEntry[]>([]);
   const [sessions, setSessions] = useState<LocalMoodSession[]>([]);
   const [mood, setMood] = useState(3);
@@ -116,13 +120,38 @@ export default function Journal() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingCloud, setLoadingCloud] = useState(false);
   const { toast } = useToast();
 
-  // Load from localStorage on mount
+  // Load entries: always start from localStorage, then merge cloud if logged in
   useEffect(() => {
-    setEntries(loadEntries());
+    const local = loadLocalEntries().map(e => ({ ...e, _source: "local" as const }));
+    setEntries(local);
     setSessions(loadSessions());
-  }, []);
+
+    if (user) {
+      setLoadingCloud(true);
+      apiRequest("GET", `/api/journal?userId=${user.id}`)
+        .then(r => r.json())
+        .then((cloud: LocalJournalEntry[]) => {
+          const cloudTagged = cloud.map(e => ({
+            ...e,
+            createdAt: typeof e.createdAt === "number"
+              ? new Date(e.createdAt * 1000).toISOString()
+              : String(e.createdAt),
+            _source: "cloud" as const,
+          }));
+          // Merge: cloud entries come first, deduplicate by id if needed
+          const localIds = new Set(local.map(e => e.id));
+          const cloudNew = cloudTagged.filter(e => !localIds.has(e.id));
+          const merged = [...cloudTagged, ...local.filter(e => e._source === "local")]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setEntries(merged);
+        })
+        .catch(() => { /* non-critical, stay with local */ })
+        .finally(() => setLoadingCloud(false));
+    }
+  }, [user?.id]);
 
   const avgMoodImprovement = sessions
     .filter(s => s.moodBefore && s.moodAfter)
@@ -134,30 +163,68 @@ export default function Journal() {
 
   const handleAdd = async () => {
     setSaving(true);
-    const newEntry: LocalJournalEntry = {
-      id: Date.now(),
-      mood,
-      energy,
-      note: note.trim() || null,
-      tags: JSON.stringify(selectedTags),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newEntry, ...entries];
-    setEntries(updated);
-    saveEntries(updated);
-    setNote("");
-    setSelectedTags([]);
-    setMood(3);
-    setEnergy(3);
-    setAdding(false);
-    setSaving(false);
-    toast({ title: "Entry saved" });
+    try {
+      if (user) {
+        // Save to backend when logged in
+        const res = await apiRequest("POST", "/api/journal", {
+          userId: user.id,
+          mood,
+          energy,
+          note: note.trim() || null,
+          tags: JSON.stringify(selectedTags),
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          const newEntry: LocalJournalEntry = {
+            ...saved,
+            createdAt: typeof saved.createdAt === "number"
+              ? new Date(saved.createdAt * 1000).toISOString()
+              : String(saved.createdAt),
+            _source: "cloud",
+          };
+          setEntries(prev => [newEntry, ...prev]);
+        } else {
+          throw new Error("Failed to save");
+        }
+      } else {
+        // Local-only save
+        const newEntry: LocalJournalEntry = {
+          id: Date.now(),
+          mood,
+          energy,
+          note: note.trim() || null,
+          tags: JSON.stringify(selectedTags),
+          createdAt: new Date().toISOString(),
+          _source: "local",
+        };
+        const updated = [newEntry, ...entries];
+        setEntries(updated);
+        saveLocalEntries(updated.filter(e => e._source === "local"));
+      }
+
+      setNote("");
+      setSelectedTags([]);
+      setMood(3);
+      setEnergy(3);
+      setAdding(false);
+      toast({ title: "Entry saved" });
+    } catch {
+      toast({ title: "Could not save entry", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number, source?: string) => {
+    if (source === "cloud" && user) {
+      try {
+        await apiRequest("DELETE", `/api/journal/${id}`);
+      } catch { /* best-effort */ }
+    }
     const updated = entries.filter(e => e.id !== id);
     setEntries(updated);
-    saveEntries(updated);
+    // Update local storage too
+    saveLocalEntries(updated.filter(e => e._source === "local"));
     toast({ title: "Entry deleted" });
   };
 
@@ -167,8 +234,27 @@ export default function Journal() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold text-foreground">Mood Journal</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Track how you feel day-to-day. Entries are saved in your browser.
+          <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1.5">
+            {user ? (
+              <>
+                <Cloud className="h-3.5 w-3.5 text-primary" />
+                Synced to your account · entries persist across devices
+              </>
+            ) : (
+              <>
+                <CloudOff className="h-3.5 w-3.5" />
+                Saved in your browser ·{" "}
+                <button
+                  className="text-primary underline underline-offset-2 font-medium"
+                  onClick={() => {
+                    // Dispatch a custom event the Layout picks up — or just link to sign in
+                    document.dispatchEvent(new CustomEvent("mm:open-account"));
+                  }}
+                >
+                  sign in to sync
+                </button>
+              </>
+            )}
           </p>
         </div>
         <Button
@@ -280,7 +366,14 @@ export default function Journal() {
       )}
 
       {/* Entry list */}
-      {entries.length === 0 ? (
+      {loadingCloud && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading cloud entries…
+        </div>
+      )}
+
+      {entries.length === 0 && !loadingCloud ? (
         <div className="text-center py-16 space-y-3">
           <BookOpen className="h-10 w-10 text-muted-foreground/40 mx-auto" />
           <p className="text-muted-foreground font-semibold">No journal entries yet</p>
@@ -296,7 +389,7 @@ export default function Journal() {
           {entries.map(entry => {
             const tags = entry.tags ? JSON.parse(entry.tags) as string[] : [];
             return (
-              <Card key={entry.id} className="border-border group hover:shadow-md transition-shadow">
+              <Card key={`${entry._source}-${entry.id}`} className="border-border group hover:shadow-md transition-shadow">
                 <CardContent className="p-4 flex gap-4 items-start">
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
                     <span className="text-2xl" title={`Mood: ${entry.mood}/5`}>{moodEmoji[entry.mood]}</span>
@@ -310,9 +403,12 @@ export default function Journal() {
                           weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                         })}
                         <span className="ml-2">{energyEmoji[entry.energy]} Energy {entry.energy}/5</span>
+                        {entry._source === "cloud" && (
+                          <Cloud className="h-3 w-3 text-primary/60" title="Synced" />
+                        )}
                       </div>
                       <button
-                        onClick={() => handleDelete(entry.id)}
+                        onClick={() => handleDelete(entry.id, entry._source)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                         aria-label="Delete entry"
                       >

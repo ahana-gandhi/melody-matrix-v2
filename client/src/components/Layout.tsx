@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Moon, Sun, Menu, X, AlertCircle } from "lucide-react";
+import { Moon, Sun, Menu, X, AlertCircle, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAuthStore } from "@/store/authStore";
+import { AccountModal } from "@/components/AccountModal";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -56,6 +58,37 @@ function CrisisBanner() {
   );
 }
 
+function AccountButton() {
+  const { user, rehydrate } = useAuthStore();
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Rehydrate from localStorage on first render
+  useEffect(() => { rehydrate(); }, []);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setModalOpen(true)}
+        className="gap-2 rounded-full px-3 h-9 text-sm font-semibold text-muted-foreground hover:text-foreground"
+        aria-label={user ? `Account: ${user.username}` : "Sign in"}
+        data-testid="button-account"
+      >
+        <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+          user ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        }`}>
+          {user ? user.username[0].toUpperCase() : <UserRound className="h-3.5 w-3.5" />}
+        </div>
+        <span className="hidden sm:inline max-w-[100px] truncate">
+          {user ? user.username : "Sign in"}
+        </span>
+      </Button>
+      <AccountModal open={modalOpen} onOpenChange={setModalOpen} />
+    </>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -98,7 +131,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 {link.label}
               </Link>
             ))}
-            <div className="ml-3 pl-3 border-l border-border">
+            <div className="ml-3 pl-3 border-l border-border flex items-center gap-1">
+              <AccountButton />
               <ThemeToggle />
             </div>
           </div>

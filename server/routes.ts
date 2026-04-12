@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { insertMoodSessionSchema, insertJournalEntrySchema, insertUserSchema } from "@shared/schema";
+import { insertMoodSessionSchema, insertJournalEntrySchema } from "@shared/schema";
 import { z } from "zod";
 import * as crypto from "crypto";
 
@@ -13,20 +13,18 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // ── Auth ───────────────────────────────────────────────────────────────
   app.post("/api/auth/register", (req, res) => {
     try {
-      const { name, email, password } = z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
+      const { username, password } = z.object({
+        username: z.string().min(3),
         password: z.string().min(6),
       }).parse(req.body);
 
-      const existing = storage.getUserByEmail(email);
+      const existing = storage.getUserByUsername(username);
       if (existing) {
-        return res.status(409).json({ error: "Email already registered" });
+        return res.status(409).json({ error: "Username already taken" });
       }
 
       const user = storage.createUser({
-        name,
-        email,
+        username,
         passwordHash: hashPassword(password),
       });
 
@@ -39,14 +37,14 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
   app.post("/api/auth/login", (req, res) => {
     try {
-      const { email, password } = z.object({
-        email: z.string().email(),
+      const { username, password } = z.object({
+        username: z.string(),
         password: z.string(),
       }).parse(req.body);
 
-      const user = storage.getUserByEmail(email);
+      const user = storage.getUserByUsername(username);
       if (!user || user.passwordHash !== hashPassword(password)) {
-        return res.status(401).json({ error: "Invalid email or password" });
+        return res.status(401).json({ error: "Invalid username or password" });
       }
 
       const { passwordHash: _, ...safeUser } = user;
