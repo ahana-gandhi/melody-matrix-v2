@@ -204,7 +204,7 @@ export default function Assessment() {
 
       nextStep();
       setTimeout(() => {
-        confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 }, colors: ["#2d7a63", "#4a9d7e", "#7b5ea7"] });
+        confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 }, colors: ["#9333ea", "#a855f7", "#c084fc"] });
       }, 300);
       toast({ title: "Your track is ready!" });
     } catch (err: any) {

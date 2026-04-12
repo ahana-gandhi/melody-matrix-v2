@@ -9,6 +9,8 @@ import { AccountModal } from "@/components/AccountModal";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/assessment", label: "Assessment" },
+  { href: "/presets", label: "Presets" },
+  { href: "/guided", label: "Guided" },
   { href: "/journal", label: "Journal" },
   { href: "/about", label: "About" },
 ];
