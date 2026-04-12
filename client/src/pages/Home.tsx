@@ -44,12 +44,9 @@ export default function Home() {
       {/* ── Hero ── */}
       <section className="relative overflow-hidden">
         {/* Background gradient blob */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden
-        >
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full opacity-10 dark:opacity-20"
-            style={{ background: "radial-gradient(ellipse at center, hsl(var(--primary)) 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(ellipse at center, hsl(262 80% 65%) 0%, transparent 70%)" }}
           />
         </div>
 
@@ -157,12 +154,9 @@ export default function Home() {
 
       {/* ── CTA ── */}
       <section className="py-28 px-4 sm:px-6 text-center relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden
-        >
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full opacity-8 dark:opacity-15"
-            style={{ background: "radial-gradient(ellipse at center, hsl(var(--primary)) 0%, transparent 70%)" }}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full opacity-10 dark:opacity-15"
+            style={{ background: "radial-gradient(ellipse at center, hsl(262 80% 65%) 0%, transparent 70%)" }}
           />
         </div>
         <div className="relative max-w-2xl mx-auto">

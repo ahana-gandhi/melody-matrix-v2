@@ -4,6 +4,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { Layout } from "@/components/Layout";
+import { ApiKeyProvider } from "@/components/ApiKeyModal";
 import Home from "@/pages/Home";
 import Assessment from "@/pages/Assessment";
 import Journal from "@/pages/Journal";
@@ -14,6 +15,7 @@ import NotFound from "@/pages/NotFound";
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ApiKeyProvider>
       <Router hook={useHashLocation}>
         <Layout>
           <Switch>
@@ -26,6 +28,7 @@ export default function App() {
           </Switch>
         </Layout>
       </Router>
+      </ApiKeyProvider>
       <Toaster />
     </QueryClientProvider>
   );
