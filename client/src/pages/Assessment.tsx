@@ -9,7 +9,6 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { useToast } from "@/hooks/use-toast";
-import { useApiKey } from "@/components/ApiKeyModal";
 import { apiRequest } from "@/lib/queryClient";
 import {
   ArrowLeft, ArrowRight, Loader2, AlertCircle, RefreshCw,
@@ -120,7 +119,6 @@ export default function Assessment() {
   } = useAssessmentStore();
 
   const { toast } = useToast();
-  const { geminiKey, showKeyModal } = useApiKey();
   const [generating, setGenerating] = useState(false);
   const [genStatus, setGenStatus] = useState("");
   const [genProgress, setGenProgress] = useState(0);
@@ -140,12 +138,6 @@ export default function Assessment() {
       toast({ title: "Please complete all selections", variant: "destructive" });
       return;
     }
-    // Check for API key before starting
-    if (!geminiKey) {
-      showKeyModal();
-      return;
-    }
-
     const { prompt, summary, issueTitle: iTitle, instrumentLabel: iLabel } =
       buildTherapeuticPrompt({
         issue: selectedIssue,
@@ -165,8 +157,7 @@ export default function Assessment() {
     try {
       const url = await generateMusic(
         { prompt, instrument: selectedInstrument, tempo },
-        (status, pct) => { setGenStatus(status); setGenProgress(pct); },
-        geminiKey
+        (status, pct) => { setGenStatus(status); setGenProgress(pct); }
       );
 
       setGeneratedTrackUrl(url);
@@ -193,11 +184,7 @@ export default function Assessment() {
       }, 300);
       toast({ title: "Your track is ready!" });
     } catch (err: any) {
-      if (err.message === "__KEY_MISSING__") {
-        showKeyModal();
-      } else {
-        toast({ title: "Generation failed", description: err.message, variant: "destructive" });
-      }
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
       setGenerating(false);
     }
@@ -466,24 +453,6 @@ export default function Assessment() {
               </p>
             </CardContent>
           </Card>
-        )}
-
-        {/* API key reminder */}
-        {!geminiKey && !generating && (
-          <div className="flex items-center gap-3 p-3 rounded-xl border border-primary/30 bg-primary/5 text-sm">
-            <span className="text-muted-foreground flex-1">A Gemini API key is required to generate music.</span>
-            <Button size="sm" variant="outline" onClick={showKeyModal} className="rounded-full gap-1.5 flex-shrink-0">
-              Add key
-            </Button>
-          </div>
-        )}
-        {geminiKey && !generating && (
-          <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30 text-sm">
-            <span className="text-muted-foreground flex-1">API key set ✓</span>
-            <Button size="sm" variant="ghost" onClick={showKeyModal} className="rounded-full gap-1.5 flex-shrink-0 text-xs">
-              Change
-            </Button>
-          </div>
         )}
 
         <div className="flex justify-between">
