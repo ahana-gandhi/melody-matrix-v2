@@ -10,11 +10,13 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BreathingExercise } from "@/components/BreathingExercise";
+import { FeedbackSurvey } from "@/components/FeedbackSurvey";
+import { SessionSummaryCard } from "@/components/SessionSummaryCard";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   ArrowLeft, ArrowRight, Loader2, AlertCircle, RefreshCw,
-  CheckCircle, ExternalLink, Music, Info,
+  CheckCircle, ExternalLink, Music, Info, MessageSquare,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
@@ -130,6 +132,7 @@ export default function Assessment() {
   const [instrumentLabel, setInstrumentLabel] = useState("");
   const [moodBefore, setMoodBefore] = useState(3);
   const [moodAfter, setMoodAfter] = useState(3);
+  const [showSurvey, setShowSurvey] = useState(false);
   const [ytVideos, setYtVideos] = useState<YouTubeVideo[]>([]);
   const [ytQuery, setYtQuery] = useState("");
   const [fetchingYt, setFetchingYt] = useState(false);
@@ -238,6 +241,7 @@ export default function Assessment() {
     setYtQuery("");
     setMoodBefore(3);
     setMoodAfter(3);
+    setShowSurvey(false);
   };
 
   // ── Render steps ───────────────────────────────────────────────────────
@@ -553,6 +557,51 @@ export default function Assessment() {
             </p>
           </div>
         </div>
+
+        {/* Session summary card */}
+        {generatedTrackUrl && selectedIssue && selectedInstrument && (() => {
+          const issueHues: Record<Issue, number> = {
+            anxiety: 270, depression: 310, stress: 200, relationship: 340, sleep: 230,
+          };
+          return (
+            <div className="rounded-xl border border-border bg-card/60 p-5">
+              <SessionSummaryCard
+                sessionName={issueTitle}
+                icon={issues.find(i => i.id === selectedIssue)?.icon ?? "🎵"}
+                instrument={instrumentLabel}
+                tempo={tempo}
+                hue={issueHues[selectedIssue] ?? 262}
+                moodBefore={moodBefore}
+                moodAfter={moodAfter}
+              />
+            </div>
+          );
+        })()}
+
+        {/* Feedback survey */}
+        {!showSurvey ? (
+          <div className="rounded-xl border border-border bg-card/60 p-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Help improve this app</p>
+              <p className="text-xs text-muted-foreground mt-0.5">30 seconds · anonymous · reaches the developer directly</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-full flex-shrink-0"
+              onClick={() => setShowSurvey(true)}
+            >
+              <MessageSquare className="h-4 w-4" /> Give Feedback
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-primary/20 bg-card p-5">
+            <FeedbackSurvey
+              sessionName={`${issueTitle} · ${instrumentLabel} · ${tempo} BPM`}
+              onClose={() => setShowSurvey(false)}
+            />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3">

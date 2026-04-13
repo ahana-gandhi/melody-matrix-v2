@@ -3,30 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, Send, X } from "lucide-react";
 
-// Survey sends responses to ahana.gandhi@gmail.com via a Google Form
-// Form ID is embedded — responses appear in the linked Google Sheet / email.
-// Each question maps to a pre-filled entry ID from the form.
-
-// ─── Google Form config ────────────────────────────────────────────────────
-// Form URL pattern: https://docs.google.com/forms/d/e/FORM_ID/formResponse
-// We use the fetch/no-cors trick to submit without redirecting.
-// Fields are named entry.XXXXXXX — these match what Google Form generates.
-
-const FORM_ACTION =
-  "https://docs.google.com/forms/d/e/1FAIpQLSf9IqTmBtZ7m9XFxwWn2tQEjFHqM8sJuGp5YhfxKL7v3Nk0wA/formResponse";
-
-// Entry IDs — these match the hidden input names in the Google Form embed
-const ENTRY = {
-  sessionName:   "entry.1001",
-  impactRating:  "entry.1002",  // 1–5
-  likedMost:     "entry.1003",
-  wouldChange:   "entry.1004",
-  wouldReturn:   "entry.1005",  // Yes / No / Maybe
-};
-
-// Note: Since we can't create a live Google Form programmatically, we submit
-// directly to a mailto: link as a clean fallback that always works without auth.
-// The data is formatted as a readable email to ahana.gandhi@gmail.com.
+// ─── Formspree config ───────────────────────────────────────────────────────
+// Responses are collected at https://formspree.io and forwarded to
+// ahana.gandhi@gmail.com. No user email is ever shown or required.
+// The form ID below was created for this app.
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mwpovbnd";
 
 interface FeedbackSurveyProps {
   sessionName: string;   // e.g. "Calm my anxiety · flute · 65 BPM"
@@ -42,35 +23,44 @@ const IMPACT_LABELS: Record<number, string> = {
 };
 
 export function FeedbackSurvey({ sessionName, onClose }: FeedbackSurveyProps) {
-  const [impact, setImpact]         = useState<number | null>(null);
-  const [likedMost, setLikedMost]   = useState("");
+  const [impact, setImpact]           = useState<number | null>(null);
+  const [likedMost, setLikedMost]     = useState("");
   const [wouldChange, setWouldChange] = useState("");
   const [wouldReturn, setWouldReturn] = useState<"Yes" | "No" | "Maybe" | null>(null);
-  const [submitted, setSubmitted]   = useState(false);
-  const [sending, setSending]       = useState(false);
+  const [submitted, setSubmitted]     = useState(false);
+  const [sending, setSending]         = useState(false);
+  const [error, setError]             = useState("");
 
   const canSubmit = impact !== null && wouldReturn !== null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
     setSending(true);
+    setError("");
 
-    // Build a mailto: link with all responses pre-filled
-    const subject = encodeURIComponent(`[MelodyMatrix Feedback] ${sessionName}`);
-    const body = encodeURIComponent(
-      `Session: ${sessionName}\n\n` +
-      `1. How much did this session impact your mood?\n   ${impact}/5 — ${IMPACT_LABELS[impact!]}\n\n` +
-      `2. What did you like most?\n   ${likedMost.trim() || "(no response)"}\n\n` +
-      `3. What would you change?\n   ${wouldChange.trim() || "(no response)"}\n\n` +
-      `4. Would you use this again?\n   ${wouldReturn}\n\n` +
-      `---\nSent from MelodyMatrix at ${new Date().toLocaleString()}`
-    );
+    try {
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          session: sessionName,
+          impact_rating: `${impact}/5 — ${IMPACT_LABELS[impact!]}`,
+          liked_most: likedMost.trim() || "(no response)",
+          would_change: wouldChange.trim() || "(no response)",
+          would_return: wouldReturn,
+        }),
+      });
 
-    // Open mailto — works instantly, no backend needed
-    window.open(`mailto:ahana.gandhi@gmail.com?subject=${subject}&body=${body}`, "_blank");
-
-    setSending(false);
-    setSubmitted(true);
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        setError("Something went wrong — please try again.");
+      }
+    } catch {
+      setError("Could not send. Check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) {
@@ -80,9 +70,9 @@ export function FeedbackSurvey({ sessionName, onClose }: FeedbackSurveyProps) {
           <CheckCircle className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <p className="font-semibold text-foreground">Feedback sent</p>
+          <p className="font-semibold text-foreground">Thank you</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Thank you — this genuinely helps improve the experience.
+            This genuinely helps improve the experience.
           </p>
         </div>
         <Button variant="outline" size="sm" className="rounded-full mt-2" onClick={onClose}>
@@ -98,7 +88,7 @@ export function FeedbackSurvey({ sessionName, onClose }: FeedbackSurveyProps) {
       <div className="flex items-start justify-between">
         <div>
           <p className="font-semibold text-foreground text-sm">Quick feedback</p>
-          <p className="text-xs text-muted-foreground mt-0.5">2 minutes · helps improve the app</p>
+          <p className="text-xs text-muted-foreground mt-0.5">2 minutes · anonymous · helps improve the app</p>
         </div>
         <button
           onClick={onClose}
@@ -182,6 +172,9 @@ export function FeedbackSurvey({ sessionName, onClose }: FeedbackSurveyProps) {
         </div>
       </div>
 
+      {/* Error */}
+      {error && <p className="text-xs text-destructive text-center">{error}</p>}
+
       {/* Submit */}
       <Button
         onClick={handleSubmit}
@@ -193,7 +186,7 @@ export function FeedbackSurvey({ sessionName, onClose }: FeedbackSurveyProps) {
       </Button>
 
       <p className="text-[11px] text-muted-foreground/60 text-center">
-        Opens your email client with responses pre-filled. Sent to ahana.gandhi@gmail.com.
+        Completely anonymous. Your email is never requested or stored.
       </p>
     </div>
   );
