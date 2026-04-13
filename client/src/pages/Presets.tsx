@@ -300,13 +300,14 @@ export default function Presets() {
 
       {/* Preset grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredPresets.map(preset => (
+        {filteredPresets.map((preset, i) => (
           <button
             key={preset.id}
             onClick={() => { setClipDurationMs(DEFAULT_DURATION_MS); setTrackUrl(null); setActivePreset(preset); }}
             disabled={generating}
             data-testid={`preset-${preset.id}`}
-            className="text-left group rounded-lg border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all p-5 space-y-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+            style={{ animationDelay: `${i * 40}ms` }}
+            className="text-left group rounded-lg border border-border bg-card hover:border-primary/50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5 space-y-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 animate-fade-in-up"
           >
             <div className="flex items-start justify-between">
               <span className="text-3xl">{preset.icon}</span>

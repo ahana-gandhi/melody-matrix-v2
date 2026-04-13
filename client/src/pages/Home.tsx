@@ -1,12 +1,12 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Shield, Brain, BookOpen } from "lucide-react";
+import { ArrowRight, Play, Shield, Brain, Wind, Zap } from "lucide-react";
 
 const steps = [
   { num: "01", title: "Choose your focus", desc: "Anxiety, sleep, stress, mood, or relationship challenges." },
   { num: "02", title: "Answer 5 questions", desc: "Slider-based, adapted from GAD-7, PHQ-9, ISI screening tools." },
   { num: "03", title: "Pick your sound", desc: "Instrument and tempo that feel right to you." },
-  { num: "04", title: "Listen", desc: "Lyria AI streams a unique composition in real time. Download it, log it." },
+  { num: "04", title: "Listen & Reflect", desc: "AI streams a unique composition in real time, then guides you through a short reflection." },
 ];
 
 const stats = [
@@ -24,12 +24,12 @@ const features = [
   {
     icon: <Play className="h-6 w-6" />,
     title: "Real-time AI composition",
-    desc: "Google Lyria streams a unique piece based on your responses. Every session is original.",
+    desc: "A unique track streams in real time based on your responses — instrument, tempo, and emotional character calibrated to you.",
   },
   {
-    icon: <BookOpen className="h-6 w-6" />,
-    title: "Mood Journal",
-    desc: "Track how music affects your mood over time. Build a personal dataset of your wellness journey.",
+    icon: <Wind className="h-6 w-6" />,
+    title: "Guided Sessions",
+    desc: "Immersive breathing exercises paired with AI music, guided by your emotional focus.",
   },
   {
     icon: <Shield className="h-6 w-6" />,
@@ -52,21 +52,14 @@ export default function Home() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-28">
           <div className="max-w-3xl animate-fade-in-up">
-            <div className="pill-green mb-8">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-                <circle cx="6" cy="6" r="6"/>
-              </svg>
-              Powered by Google Lyria AI
-            </div>
-
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl text-foreground leading-[1.05] mb-6">
-              Music shaped<br />
-              <span className="text-primary">to your</span><br />
-              mental state.
+              Music composed<br />
+              <span className="text-primary">for how you</span><br />
+              feel right now.
             </h1>
 
             <p className="text-muted-foreground text-xl leading-relaxed mb-3 max-w-2xl">
-              MelodyMatrix takes a brief wellness assessment and composes a unique piece of music — instrument, tempo, and emotional character calibrated to you.
+              Answer a short wellness check-in, and MelodyMatrix composes a unique piece of music — instrument, tempo, and emotional character calibrated to your state.
             </p>
 
             <p className="text-sm text-muted-foreground mb-10 flex items-start gap-2 max-w-lg">
@@ -84,13 +77,22 @@ export default function Home() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/about">
+              <Link href="/guided">
                 <Button
                   size="lg"
                   variant="outline"
                   className="gap-2 rounded-full px-8 border-border text-foreground font-semibold"
                 >
-                  How It Works
+                  <Wind className="h-4 w-4" /> Guided Session
+                </Button>
+              </Link>
+              <Link href="/presets">
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  className="gap-2 rounded-full px-6 text-muted-foreground hover:text-foreground font-semibold"
+                >
+                  <Zap className="h-4 w-4" /> Quick Presets
                 </Button>
               </Link>
             </div>

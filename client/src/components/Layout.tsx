@@ -9,7 +9,6 @@ const navLinks = [
   { href: "/assessment", label: "Assessment" },
   { href: "/presets", label: "Presets" },
   { href: "/guided", label: "Guided" },
-  { href: "/journal", label: "Journal" },
   { href: "/about", label: "About" },
 ];
 
@@ -165,7 +164,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <a href="tel:988" className="hover:text-foreground transition-colors font-semibold text-primary">Crisis: 988</a>
             </div>
             <p className="text-xs text-muted-foreground">
-              Powered by Google Lyria AI · Built with care
+              Built with care for human wellbeing
             </p>
           </div>
         </div>
