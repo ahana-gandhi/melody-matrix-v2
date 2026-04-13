@@ -1,12 +1,14 @@
 /**
- * lyria.ts — Google Lyria Realtime music generation via WebSocket streaming.
+ * lyria.ts — Google Lyria music generation.
  *
- * Primary model : lyria-realtime-exp  (free, experimental — no shutdown date)
- * Fallback model: lyria-3-clip-preview (paid ~$0.04/clip, stable GA)
+ * Primary model : lyria-realtime-exp  (free, experimental — WebSocket streaming)
+ * Fallback model: lyria-3-clip-preview (paid ~$0.04/clip, REST generateContent)
  *
- * The fallback fires automatically if lyria-realtime-exp returns a connection
- * error, quota error, or any non-audio response. No user action needed.
- * To migrate permanently, swap PRIMARY_MODEL ↔ FALLBACK_MODEL below.
+ * The two models use DIFFERENT APIs:
+ *   - lyria-realtime-exp   → aiClient.live.music.connect() WebSocket session
+ *   - lyria-3-clip-preview → aiClient.models.generateContent() REST call (returns MP3)
+ *
+ * The fallback fires automatically on any primary-model API error.
  */
 
 import { GoogleGenAI, MusicGenerationMode } from "@google/genai";
@@ -23,30 +25,28 @@ export interface ComposeRequest {
   prompt: string;
   instrument?: string;
   tempo?: number;
-  /** How many ms of audio to collect. Defaults to DEFAULT_CLIP_MS (28 s). */
+  /** How many ms of audio to collect via the realtime model. Defaults to DEFAULT_CLIP_MS (28 s). */
   clipDurationMs?: number;
 }
 
 const BUILD_TIME_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
-// ── Model config ────────────────────────────────────────────────────────────
-// To permanently switch to Lyria 3 (paid, stable), swap these two lines:
 const PRIMARY_MODEL  = "models/lyria-realtime-exp";
-const FALLBACK_MODEL = "models/lyria-3-clip-preview"; // ~$0.04/clip
+const FALLBACK_MODEL = "lyria-3-clip-preview"; // REST generateContent, ~$0.04/clip
 
-const SAMPLE_RATE    = 48000;
-const CHANNELS       = 2;
+const SAMPLE_RATE     = 48000;
+const CHANNELS        = 2;
 const BITS_PER_SAMPLE = 16;
 
-/** Default clip length — 28 s fits within one Lyria session, generates in real-time. */
-const DEFAULT_CLIP_MS  = 28_000;
+/** Default clip length — 28 s fits within one Lyria realtime session. */
+const DEFAULT_CLIP_MS    = 28_000;
 /** Hard abort if no audio arrives within this window. */
 const CONNECT_TIMEOUT_MS = 45_000;
 
 const WEBSOCKET_OPEN   = 1;
 const WEBSOCKET_CLOSED = 3;
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 const clamp = (v: number, min: number, max: number) =>
   Math.min(Math.max(v, min), max);
@@ -107,10 +107,9 @@ const safeStop = (s?: LiveMusicSession) => {
   try { s.close(); } catch {}
 };
 
-// ── Core generation (single model attempt) ──────────────────────────────────
+// ── Primary: lyria-realtime-exp (WebSocket live session) ─────────────────────
 
-const attemptGeneration = async (
-  modelName: string,
+const attemptRealtimeGeneration = async (
   request: ComposeRequest,
   clipMs: number,
   onProgress?: ProgressCallback,
@@ -123,7 +122,7 @@ const attemptGeneration = async (
   const prompt = request.prompt.trim();
   if (!prompt) throw new Error("Prompt is required.");
 
-  onProgress?.("Connecting to Lyria…", 5);
+  onProgress?.("Connecting…", 5);
 
   const aiClient = new GoogleGenAI({
     apiKey: GEMINI_API_KEY,
@@ -152,7 +151,6 @@ const attemptGeneration = async (
         firstChunkReceived = true;
         onProgress?.("Streaming audio…", 30);
 
-        // Collect audio for clipMs then close
         stopTimer = setTimeout(() => {
           safeStop(session);
         }, clipMs);
@@ -160,7 +158,6 @@ const attemptGeneration = async (
         if (hardTimeout) clearTimeout(hardTimeout);
       }
 
-      // Progress 30 → 90% during streaming
       const elapsed        = audioChunks.reduce((a, c) => a + c.length, 0);
       const estimatedTotal = (SAMPLE_RATE * CHANNELS * (BITS_PER_SAMPLE / 8) * (clipMs / 1000));
       const streamPct      = Math.min(90, 30 + Math.round((elapsed / estimatedTotal) * 60));
@@ -187,7 +184,7 @@ const attemptGeneration = async (
     musicConfig.bpm = clamp(Math.round(request.tempo), 60, 200);
   }
 
-  session = await aiClient.live.music.connect({ model: modelName, callbacks });
+  session = await aiClient.live.music.connect({ model: PRIMARY_MODEL, callbacks });
   await session.setWeightedPrompts({ weightedPrompts: [{ text: prompt, weight: 1 }] });
   await session.setMusicGenerationConfig({ musicGenerationConfig: musicConfig });
   session.play();
@@ -212,7 +209,57 @@ const attemptGeneration = async (
   return URL.createObjectURL(blob);
 };
 
-// ── Main export — tries primary, falls back to Lyria 3 on failure ───────────
+// ── Fallback: lyria-3-clip-preview (REST generateContent, returns MP3) ────────
+
+const attemptClipGeneration = async (
+  request: ComposeRequest,
+  onProgress?: ProgressCallback,
+): Promise<string> => {
+  const GEMINI_API_KEY = BUILD_TIME_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error("Gemini API key not configured.");
+  }
+
+  const prompt = request.prompt.trim();
+  onProgress?.("Composing with fallback model…", 15);
+
+  const aiClient = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+  // Simulate progress during the blocking REST call
+  let pct = 15;
+  const progressInterval = setInterval(() => {
+    pct = Math.min(85, pct + 5);
+    onProgress?.("Composing…", pct);
+  }, 2000);
+
+  try {
+    const response = await (aiClient as any).models.generateContent({
+      model: FALLBACK_MODEL,
+      contents: prompt,
+    });
+
+    clearInterval(progressInterval);
+    onProgress?.("Finalizing…", 90);
+
+    // The response contains inlineData with base64-encoded MP3
+    const parts = response?.candidates?.[0]?.content?.parts ?? [];
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        const mimeType = part.inlineData.mimeType ?? "audio/mp3";
+        const bytes    = decodeBase64Chunk(part.inlineData.data);
+        const blob     = new Blob([bytes], { type: mimeType });
+        onProgress?.("Track ready", 100);
+        return URL.createObjectURL(blob);
+      }
+    }
+
+    throw new Error("No audio in fallback model response.");
+  } finally {
+    clearInterval(progressInterval);
+  }
+};
+
+// ── Main export — tries primary (realtime), falls back to clip on failure ─────
 
 export const generateMusic = async (
   request: ComposeRequest,
@@ -220,32 +267,28 @@ export const generateMusic = async (
 ): Promise<string> => {
   const clipMs = request.clipDurationMs ?? DEFAULT_CLIP_MS;
 
-  try {
-    return await attemptGeneration(PRIMARY_MODEL, request, clipMs, onProgress);
-  } catch (primaryErr: any) {
-    // Only fall back on likely API-level errors (not user-facing ones like missing key)
-    const msg = primaryErr?.message ?? "";
-    const isApiError =
-      msg.includes("timed out") ||
-      msg.includes("quota") ||
-      msg.includes("429") ||
-      msg.includes("403") ||
-      msg.includes("unavailable") ||
-      msg.includes("WebSocket") ||
-      msg.includes("streaming") ||
-      msg.includes("No audio received");
+  // Check for missing key before even trying
+  if (!BUILD_TIME_KEY) {
+    throw new Error("Gemini API key not configured. Add VITE_GEMINI_API_KEY and rebuild.");
+  }
 
-    if (!isApiError) throw primaryErr; // e.g. missing API key — don't bother retrying
+  try {
+    return await attemptRealtimeGeneration(request, clipMs, onProgress);
+  } catch (primaryErr: any) {
+    const msg = primaryErr?.message ?? "";
+
+    // Don't fall back on a missing key — it'll fail the same way
+    if (msg.includes("not configured")) throw primaryErr;
 
     console.warn(
-      `[Lyria] ${PRIMARY_MODEL} failed (${msg}). Falling back to ${FALLBACK_MODEL}…`
+      `[Lyria] ${PRIMARY_MODEL} failed: "${msg}". Falling back to ${FALLBACK_MODEL}…`
     );
     onProgress?.("Switching to fallback model…", 10);
 
     try {
-      return await attemptGeneration(FALLBACK_MODEL, request, clipMs, onProgress);
+      return await attemptClipGeneration(request, onProgress);
     } catch (fallbackErr: any) {
-      // Both models failed — surface a clear user-facing message
+      console.error("[Lyria] Fallback also failed:", fallbackErr?.message);
       throw new Error(
         "Music generation is temporarily unavailable. Please try again in a few minutes."
       );
