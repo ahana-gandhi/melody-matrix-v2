@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Layout } from "@/components/Layout";
 import Home from "@/pages/Home";
 import Assessment from "@/pages/Assessment";
-import Journal from "@/pages/Journal";
 import About from "@/pages/About";
 import Privacy from "@/pages/Privacy";
 import Presets from "@/pages/Presets";
@@ -21,7 +20,6 @@ export default function App() {
           <Switch>
             <Route path="/" component={Home} />
             <Route path="/assessment" component={Assessment} />
-            <Route path="/journal" component={Journal} />
             <Route path="/presets" component={Presets} />
             <Route path="/guided" component={Guided} />
             <Route path="/about" component={About} />

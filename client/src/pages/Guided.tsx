@@ -274,12 +274,13 @@ export default function Guided() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {THEMES.map(t => (
+          {THEMES.map((t, i) => (
             <button
               key={t.id}
               onClick={() => setTheme(t)}
               data-testid={`theme-${t.id}`}
-              className={`relative text-left p-5 rounded-xl border overflow-hidden transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group ${
+              style={{ animationDelay: `${i * 60}ms` }}
+              className={`relative text-left p-5 rounded-xl border overflow-hidden transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group animate-fade-in-up ${
                 theme?.id === t.id
                   ? "border-primary ring-1 ring-primary shadow-lg shadow-primary/20"
                   : "border-border bg-card hover:border-primary/50 hover:shadow-md"
