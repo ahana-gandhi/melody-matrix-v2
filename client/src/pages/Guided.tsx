@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { generateMusic } from "@/services/lyria";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BreathingExercise } from "@/components/BreathingExercise";
 import { FeedbackSurvey } from "@/components/FeedbackSurvey";
+import { SessionSummaryCard } from "@/components/SessionSummaryCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -75,155 +76,6 @@ const THEMES: SessionTheme[] = [
 // ── Step types ─────────────────────────────────────────────────────────────
 
 type Step = "choose" | "breathe" | "reveal" | "listen" | "reflect" | "summary";
-
-// ── Feature C: Web Audio waveform visualizer ───────────────────────────────
-// Reads frequency data from the audio element via AnalyserNode and draws
-// a smooth circular waveform that reacts to the actual music playing.
-
-function WaveformVisualizer({
-  audioRef,
-  hue,
-  playing,
-}: {
-  audioRef: React.RefObject<HTMLAudioElement | null>;
-  hue: number;
-  playing: boolean;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef   = useRef<number>(0);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef   = useRef<MediaElementAudioSourceNode | null>(null);
-  const ctxRef      = useRef<AudioContext | null>(null);
-
-  // Set up Web Audio API when audio element is available and playing
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !playing) return;
-
-    try {
-      if (!ctxRef.current) {
-        ctxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const audioCtx = ctxRef.current;
-
-      if (!sourceRef.current) {
-        sourceRef.current = audioCtx.createMediaElementSource(audio);
-        analyserRef.current = audioCtx.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.82;
-        sourceRef.current.connect(analyserRef.current);
-        analyserRef.current.connect(audioCtx.destination);
-      }
-
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume();
-      }
-    } catch {
-      // Web Audio not supported — visualizer degrades gracefully to pulsing rings
-    }
-  }, [playing]);
-
-  // Animation loop
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const W = canvas.width;
-    const H = canvas.height;
-    const cx = W / 2;
-    const cy = H / 2;
-    const baseR = 70;
-    const maxAmp = 40;
-    const orbColor = `hsl(${hue}, 75%, 60%)`;
-
-    let frameId: number;
-
-    const draw = () => {
-      frameId = requestAnimationFrame(draw);
-      ctx.clearRect(0, 0, W, H);
-
-      const analyser = analyserRef.current;
-      let dataArray: Uint8Array | null = null;
-      if (analyser) {
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
-      }
-
-      const POINTS = 128;
-      const now = Date.now() / 1000;
-
-      // Outer ambient rings (always visible)
-      [120, 155, 190].forEach((r, i) => {
-        let avgAmp = 0;
-        if (dataArray) {
-          const slice = Math.floor(dataArray.length / 3);
-          for (let k = i * slice; k < (i + 1) * slice; k++) {
-            avgAmp += dataArray[k] / 255;
-          }
-          avgAmp = avgAmp / slice;
-        }
-        const pulseR = r + (playing ? avgAmp * 12 : Math.sin(now * 0.8 + i) * 4);
-        ctx.beginPath();
-        ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
-        ctx.strokeStyle = `hsla(${hue}, 75%, 60%, ${playing ? 0.12 + avgAmp * 0.08 : 0.06})`;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      });
-
-      // Waveform ring
-      ctx.beginPath();
-      for (let i = 0; i <= POINTS; i++) {
-        const angle = (i / POINTS) * Math.PI * 2 - Math.PI / 2;
-        let amp = 0;
-        if (dataArray && playing) {
-          const idx = Math.floor((i / POINTS) * dataArray.length * 0.5);
-          amp = (dataArray[idx] / 255) * maxAmp;
-        } else {
-          // Idle: gentle sine wave pulse
-          amp = Math.sin(angle * 4 + now * 1.2) * 6 + Math.sin(angle * 7 - now * 0.7) * 3;
-        }
-        const r = baseR + amp;
-        const x = cx + Math.cos(angle) * r;
-        const y = cy + Math.sin(angle) * r;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-
-      // Gradient stroke
-      const grad = ctx.createLinearGradient(cx - baseR, cy, cx + baseR, cy);
-      grad.addColorStop(0,   `hsla(${hue - 20}, 80%, 70%, 0.9)`);
-      grad.addColorStop(0.5, `hsla(${hue},      75%, 65%, 1.0)`);
-      grad.addColorStop(1,   `hsla(${hue + 20}, 70%, 60%, 0.9)`);
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Core glow
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 0.75);
-      glow.addColorStop(0,   `hsla(${hue}, 80%, 70%, 0.25)`);
-      glow.addColorStop(1,   `hsla(${hue}, 60%, 50%, 0)`);
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(cx, cy, baseR * 0.75, 0, Math.PI * 2);
-      ctx.fill();
-    };
-
-    frameId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frameId);
-  }, [hue, playing]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={400}
-      height={400}
-      style={{ width: 220, height: 220 }}
-      aria-hidden
-    />
-  );
-}
 
 // ── Feature D: Music-ready reveal screen ──────────────────────────────────
 // 2-second animated moment between breathe → listen.
@@ -311,6 +163,47 @@ function MusicReveal({ theme, onDone }: { theme: SessionTheme; onDone: () => voi
   );
 }
 
+// ── Pulsing visualizer rings (listen step) ─────────────────────────────────
+
+function VisualizerRings({ hue }: { hue: number }) {
+  const orbColor = `hsl(${hue}, 75%, 62%)`;
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
+      <style>{`
+        @keyframes ring-pulse-1 { 0%, 100% { transform: scale(1);    opacity: 0.18; } 50% { transform: scale(1.08); opacity: 0.32; } }
+        @keyframes ring-pulse-2 { 0%, 100% { transform: scale(1);    opacity: 0.12; } 50% { transform: scale(1.12); opacity: 0.22; } }
+        @keyframes ring-pulse-3 { 0%, 100% { transform: scale(1),    opacity: 0.07; } 50% { transform: scale(1.16); opacity: 0.14; } }
+        @keyframes core-glow    { 0%, 100% { box-shadow: 0 0 40px 12px ${orbColor}33; } 50% { box-shadow: 0 0 60px 20px ${orbColor}55; } }
+      `}</style>
+
+      {/* Outer ambient rings */}
+      {[{ size: 200, anim: "ring-pulse-3", dur: "4.2s" }, { size: 162, anim: "ring-pulse-2", dur: "3.6s" }, { size: 130, anim: "ring-pulse-1", dur: "3s" }].map(({ size, anim, dur }) => (
+        <div
+          key={size}
+          className="absolute rounded-full border"
+          style={{
+            width: size,
+            height: size,
+            borderColor: orbColor,
+            animation: `${anim} ${dur} ease-in-out infinite`,
+          }}
+        />
+      ))}
+
+      {/* Core glow orb */}
+      <div
+        className="rounded-full"
+        style={{
+          width: 70,
+          height: 70,
+          background: `radial-gradient(circle, ${orbColor}44 0%, ${orbColor}11 65%, transparent 100%)`,
+          animation: "core-glow 3s ease-in-out infinite",
+        }}
+      />
+    </div>
+  );
+}
+
 // ── Step progress indicator ────────────────────────────────────────────────
 
 const STEP_ORDER: Step[] = ["choose", "breathe", "listen", "reflect", "summary"];
@@ -389,8 +282,6 @@ export default function Guided() {
   const [musicReady, setMusicReady]   = useState(false);
   const [showSurvey, setShowSurvey]   = useState(false);
 
-  // Ref to the <audio> element inside AudioPlayer — used for waveform
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const breathTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── When we enter breathe step ──────────────────────────────────────────
@@ -406,7 +297,6 @@ export default function Guided() {
       setBreathSecondsLeft(prev => {
         if (prev <= 1) {
           if (breathTimerRef.current) clearInterval(breathTimerRef.current);
-          // Feature D: go to reveal screen first, then listen
           setStep("reveal");
           return 0;
         }
@@ -452,7 +342,6 @@ export default function Guided() {
     setGenerating(false);
     setMusicReady(false);
     setShowSurvey(false);
-    audioRef.current = null;
   };
 
   // ── Step 1: Choose ─────────────────────────────────────────────────────────
@@ -529,7 +418,7 @@ export default function Guided() {
     );
   }
 
-  // ── Step 2: Breathe (full-screen immersive, Features A + B) ───────────────
+  // ── Step 2: Breathe (full-screen immersive) ────────────────────────────────
   if (step === "breathe" && theme) {
     const minutes = Math.floor(breathSecondsLeft / 60);
     const seconds = breathSecondsLeft % 60;
@@ -568,7 +457,7 @@ export default function Guided() {
     );
   }
 
-  // ── Step 3: Listen (Feature C: waveform visualizer) ────────────────────────
+  // ── Step 3: Listen (pulsing rings) ─────────────────────────────────────────
   if (step === "listen" && theme) {
     const orbColor = `hsl(${theme.hue}, 75%, 60%)`;
     return (
@@ -584,12 +473,8 @@ export default function Guided() {
             <h2 className="font-display text-xl font-bold text-white">{theme.label}</h2>
           </div>
 
-          {/* Feature C: waveform replaces pulsing rings when audio is present */}
-          <WaveformVisualizer
-            audioRef={audioRef}
-            hue={theme.hue}
-            playing={!generating && !!trackUrl}
-          />
+          {/* Pulsing visualizer rings */}
+          <VisualizerRings hue={theme.hue} />
 
           {generating ? (
             <div className="space-y-3 max-w-xs w-full">
@@ -605,12 +490,10 @@ export default function Guided() {
           ) : trackUrl ? (
             <div className="w-full max-w-md space-y-4">
               <p className="text-sm text-white/50">Take your time. Listen fully.</p>
-              {/* AudioPlayer renders an <audio> — we capture its ref via callback */}
               <AudioPlayer
                 audioUrl={trackUrl}
                 trackName={`${theme.label} · ${theme.instrument} · ${theme.tempo} BPM`}
                 loop
-                onAudioRef={(el) => { audioRef.current = el; }}
               />
               <Button
                 onClick={() => setStep("reflect")}
@@ -671,7 +554,7 @@ export default function Guided() {
     );
   }
 
-  // ── Step 5: Summary + Feedback survey ─────────────────────────────────────
+  // ── Step 5: Summary + Session Card + Feedback survey ───────────────────────
   if (step === "summary" && theme) {
     const lift = moodAfter - moodBefore;
     const liftLabel = lift > 0 ? `+${lift} better` : lift === 0 ? "Steady" : `${lift} lower`;
@@ -734,12 +617,25 @@ export default function Guided() {
           )}
         </div>
 
+        {/* Session summary card — saveable PNG */}
+        <div className="rounded-xl border border-border bg-card/60 p-5">
+          <SessionSummaryCard
+            sessionName={theme.label}
+            icon={theme.icon}
+            instrument={theme.instrument}
+            tempo={theme.tempo}
+            hue={theme.hue}
+            moodBefore={moodBefore}
+            moodAfter={moodAfter}
+          />
+        </div>
+
         {/* Feedback survey */}
         {!showSurvey ? (
           <div className="rounded-xl border border-border bg-card/60 p-5 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-foreground">Help improve this app</p>
-              <p className="text-xs text-muted-foreground mt-0.5">30 seconds · your feedback reaches the developer directly</p>
+              <p className="text-xs text-muted-foreground mt-0.5">30 seconds · anonymous · reaches the developer directly</p>
             </div>
             <Button
               variant="outline"

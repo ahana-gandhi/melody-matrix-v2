@@ -2,11 +2,13 @@ import { useState } from "react";
 import { generateMusic } from "@/services/lyria";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BreathingExercise } from "@/components/BreathingExercise";
+import { FeedbackSurvey } from "@/components/FeedbackSurvey";
+import { SessionSummaryCard } from "@/components/SessionSummaryCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Music, ArrowLeft, Sparkles } from "lucide-react";
+import { Loader2, Music, ArrowLeft, Sparkles, MessageSquare } from "lucide-react";
 import type { Issue, Instrument } from "@/lib/promptBuilder";
 
 // ── Preset definitions ────────────────────────────────────────────────────────
@@ -148,6 +150,7 @@ export default function Presets() {
   const [trackUrl, setTrackUrl]             = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [clipDurationMs, setClipDurationMs] = useState(DEFAULT_DURATION_MS);
+  const [showSurvey, setShowSurvey]         = useState(false);
 
   const handleGenerate = async (preset: Preset, durationMs = clipDurationMs) => {
     setActivePreset(preset);
@@ -170,10 +173,16 @@ export default function Presets() {
     }
   };
 
+  // Issue → hue map for the summary card gradient
+  const ISSUE_HUES: Record<Issue, number> = {
+    anxiety: 270, depression: 310, stress: 200, relationship: 340, sleep: 230,
+  };
+
   const handleBack = () => {
     setActivePreset(null);
     setTrackUrl(null);
     setGenerating(false);
+    setShowSurvey(false);
   };
 
   const filteredPresets = selectedCategory
@@ -237,14 +246,51 @@ export default function Presets() {
         )}
 
         {trackUrl && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <AudioPlayer audioUrl={trackUrl} trackName={`${activePreset.name} · ${activePreset.instrument} · ${activePreset.tempo} BPM`} />
+
+            {/* Session summary card */}
+            <div className="rounded-xl border border-border bg-card/60 p-5">
+              <SessionSummaryCard
+                sessionName={activePreset.name}
+                icon={activePreset.icon}
+                instrument={activePreset.instrument}
+                tempo={activePreset.tempo}
+                hue={ISSUE_HUES[activePreset.issue] ?? 262}
+              />
+            </div>
+
+            {/* Feedback survey */}
+            {!showSurvey ? (
+              <div className="rounded-xl border border-border bg-card/60 p-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Help improve this app</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">30 seconds · anonymous</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 rounded-full flex-shrink-0"
+                  onClick={() => setShowSurvey(true)}
+                >
+                  <MessageSquare className="h-4 w-4" /> Give Feedback
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-primary/20 bg-card p-5">
+                <FeedbackSurvey
+                  sessionName={`${activePreset.name} · ${activePreset.instrument} · ${activePreset.tempo} BPM`}
+                  onClose={() => setShowSurvey(false)}
+                />
+              </div>
+            )}
+
             {/* Regenerate with different duration */}
             <div className="flex justify-center gap-2">
               {DURATION_OPTIONS.map(opt => (
                 <button
                   key={opt.ms}
-                  onClick={() => { setTrackUrl(null); setClipDurationMs(opt.ms); }}
+                  onClick={() => { setTrackUrl(null); setClipDurationMs(opt.ms); setShowSurvey(false); }}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                     clipDurationMs === opt.ms
                       ? "bg-primary/20 text-primary border-primary/40"
@@ -255,7 +301,7 @@ export default function Presets() {
                 </button>
               ))}
             </div>
-            <Button onClick={() => handleGenerate(activePreset)} variant="outline" className="w-full gap-2 rounded-full">
+            <Button onClick={() => { handleGenerate(activePreset); setShowSurvey(false); }} variant="outline" className="w-full gap-2 rounded-full">
               <Sparkles className="h-4 w-4" /> Generate Again
             </Button>
           </div>

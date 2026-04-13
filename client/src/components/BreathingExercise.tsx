@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // ── Breathing patterns ───────────────────────────────────────────────────────
 
@@ -146,85 +146,6 @@ function DotField({
   );
 }
 
-// ── Ambient word drift (Feature A) ────────────────────────────────────────────
-// Slow-moving intention words that drift upward very faintly behind the dots.
-
-const THEME_WORDS: Record<string, string[]> = {
-  anxiety:      ["release", "soften", "settle", "calm", "let go", "ease", "still", "breathe"],
-  stress:       ["release", "reset", "ground", "exhale", "steady", "center", "clear", "ease"],
-  depression:   ["open", "rise", "warmth", "light", "lift", "here", "enough", "present"],
-  sleep:        ["drift", "rest", "slow", "quiet", "dim", "soft", "float", "surrender"],
-  relationship: ["together", "sync", "rhythm", "heart", "open", "listen", "feel", "attune"],
-};
-const DEFAULT_WORDS = ["breathe", "release", "calm", "open", "soften", "still"];
-
-interface WordParticle {
-  id: number;
-  word: string;
-  x: number; // percent
-  startY: number; // percent from bottom
-  duration: number; // seconds
-  delay: number;
-  opacity: number;
-  fontSize: number;
-}
-
-function buildWordParticles(words: string[], count: number): WordParticle[] {
-  const result: WordParticle[] = [];
-  for (let i = 0; i < count; i++) {
-    result.push({
-      id: i,
-      word: words[i % words.length],
-      x: 8 + ((i * 37 + 13) % 84), // 8–92% horizontal spread
-      startY: 100 + ((i * 23) % 40), // start slightly below viewport
-      duration: 18 + ((i * 7) % 14), // 18–32s each
-      delay: -(i * 3.2) % 30, // stagger starts so some are mid-float on mount
-      opacity: 0.045 + ((i * 0.007) % 0.04), // very faint: 4–8%
-      fontSize: 11 + ((i * 3) % 8), // 11–18px
-    });
-  }
-  return result;
-}
-
-function WordDrift({ issue }: { issue?: string }) {
-  const words = issue ? (THEME_WORDS[issue] ?? DEFAULT_WORDS) : DEFAULT_WORDS;
-  const particles = useMemo(() => buildWordParticles(words, 16), [issue]);
-
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
-      <style>{`
-        @keyframes word-float {
-          0%   { transform: translateY(0);    opacity: 0; }
-          8%   { opacity: 1; }
-          88%  { opacity: 1; }
-          100% { transform: translateY(-110vh); opacity: 0; }
-        }
-      `}</style>
-      {particles.map((p) => (
-        <span
-          key={p.id}
-          style={{
-            position: "absolute",
-            left: `${p.x}%`,
-            bottom: `${p.startY - 100}%`,
-            fontSize: p.fontSize,
-            color: "white",
-            fontWeight: 300,
-            letterSpacing: "0.15em",
-            textTransform: "lowercase",
-            animation: `word-float ${p.duration}s ${p.delay}s linear infinite`,
-            opacity: p.opacity,
-            userSelect: "none",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {p.word}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function BreathingExercise({ issue, active, fullscreen = false }: Props) {
@@ -326,9 +247,6 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
             to   { opacity: 1; transform: translateY(0);   }
           }
         `}</style>
-
-        {/* Feature A: ambient word drift */}
-        <WordDrift issue={issue} />
 
         {/* Feature B: animated radial glow — shifts color with phase */}
         <div
