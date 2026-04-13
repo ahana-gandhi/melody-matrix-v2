@@ -21,7 +21,7 @@ const principles = [
   {
     icon: <Heart className="h-5 w-5" />,
     title: "Data minimization",
-    body: "We store session data only to power your mood journal. We do not sell your data, share it with advertisers, or use it for AI training. Your API keys live only in your environment file and are never sent to our servers.",
+    body: "We do not store your assessment responses beyond your current session. We do not sell your data, share it with advertisers, or use it for AI training. Your API keys live only in your environment file and are never sent to our servers.",
   },
 ];
 
@@ -40,7 +40,7 @@ const hcaiPoints = [
   },
   {
     term: "Data minimization",
-    desc: "Only the data necessary to generate music and power the mood journal is collected. No behavioral tracking, no advertising.",
+    desc: "Only the data necessary to generate music is used — your assessment responses build the music prompt and nothing more. No behavioral tracking, no advertising.",
   },
   {
     term: "Non-maleficence",
@@ -99,9 +99,6 @@ export default function About() {
               </p>
               <p>
                 The music generation uses Google Lyria, a state-of-the-art generative model that streams real-time compositions via WebSocket. Unlike a playlist recommendation, every track is unique — composed fresh based on your specific responses.
-              </p>
-              <p>
-                The mood journal lets you track whether the music actually helped over time. That longitudinal view matters: it turns a one-off interaction into a personal wellness record you own.
               </p>
               <p className="text-foreground font-medium">
                 This is a project about demonstrating that AI can be built to serve people well — transparently, carefully, and without sacrificing usefulness.

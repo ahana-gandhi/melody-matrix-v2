@@ -9,6 +9,8 @@ interface AudioPlayerProps {
   trackName?: string;
   /** If true, the track loops seamlessly — used for Guided and Assessment. */
   loop?: boolean;
+  /** Callback to expose the underlying <audio> element (e.g. for Web Audio waveform). */
+  onAudioRef?: (el: HTMLAudioElement | null) => void;
 }
 
 const WaveBars = ({ playing }: { playing: boolean }) => (
@@ -36,7 +38,7 @@ const formatTime = (t: number) => {
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
 
-export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track", loop = false }: AudioPlayerProps) {
+export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track", loop = false, onAudioRef }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -105,7 +107,7 @@ export function AudioPlayer({ audioUrl, trackName = "Your Therapeutic Track", lo
   return (
     <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
       <CardContent className="p-6 space-y-4">
-        <audio ref={audioRef} src={audioUrl} preload="auto" loop={loop} />
+        <audio ref={(el) => { (audioRef as any).current = el; onAudioRef?.(el); }} src={audioUrl} preload="auto" loop={loop} />
 
         {/* Track info + visualizer */}
         <div className="flex items-center justify-between gap-4">
