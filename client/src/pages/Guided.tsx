@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { generateMusic } from "@/services/lyria";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BreathingExercise } from "@/components/BreathingExercise";
+import { FeedbackSurvey } from "@/components/FeedbackSurvey";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight, RefreshCw, CheckCircle, Wind, PenLine, Sparkles,
-  ChevronRight,
+  ChevronRight, MessageSquare,
 } from "lucide-react";
 import type { Issue, Instrument } from "@/lib/promptBuilder";
 
@@ -22,12 +22,11 @@ interface SessionTheme {
   issue: Issue;
   instrument: Instrument;
   tempo: number;
-  breathDuration: number; // seconds
+  breathDuration: number;
   prompt: string;
   reflectionPrompt: string;
-  // Visual identity
-  hue: number;        // HSL hue for the theme's color
-  gradient: string;   // tailwind gradient classes for the card
+  hue: number;
+  gradient: string;
 }
 
 const THEMES: SessionTheme[] = [
@@ -75,48 +74,239 @@ const THEMES: SessionTheme[] = [
 
 // ── Step types ─────────────────────────────────────────────────────────────
 
-type Step = "choose" | "breathe" | "listen" | "reflect" | "summary";
+type Step = "choose" | "breathe" | "reveal" | "listen" | "reflect" | "summary";
 
-// ── Pulsing visualizer rings for the listen screen ─────────────────────────
+// ── Feature C: Web Audio waveform visualizer ───────────────────────────────
+// Reads frequency data from the audio element via AnalyserNode and draws
+// a smooth circular waveform that reacts to the actual music playing.
 
-function VisualizerRings({ hue, playing }: { hue: number; playing: boolean }) {
-  const orbColor = `hsl(${hue}, 75%, 60%)`;
+function WaveformVisualizer({
+  audioRef,
+  hue,
+  playing,
+}: {
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  hue: number;
+  playing: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef   = useRef<number>(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef   = useRef<MediaElementAudioSourceNode | null>(null);
+  const ctxRef      = useRef<AudioContext | null>(null);
+
+  // Set up Web Audio API when audio element is available and playing
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !playing) return;
+
+    try {
+      if (!ctxRef.current) {
+        ctxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const audioCtx = ctxRef.current;
+
+      if (!sourceRef.current) {
+        sourceRef.current = audioCtx.createMediaElementSource(audio);
+        analyserRef.current = audioCtx.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.82;
+        sourceRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(audioCtx.destination);
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    } catch {
+      // Web Audio not supported — visualizer degrades gracefully to pulsing rings
+    }
+  }, [playing]);
+
+  // Animation loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+    const baseR = 70;
+    const maxAmp = 40;
+    const orbColor = `hsl(${hue}, 75%, 60%)`;
+
+    let frameId: number;
+
+    const draw = () => {
+      frameId = requestAnimationFrame(draw);
+      ctx.clearRect(0, 0, W, H);
+
+      const analyser = analyserRef.current;
+      let dataArray: Uint8Array | null = null;
+      if (analyser) {
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(dataArray);
+      }
+
+      const POINTS = 128;
+      const now = Date.now() / 1000;
+
+      // Outer ambient rings (always visible)
+      [120, 155, 190].forEach((r, i) => {
+        let avgAmp = 0;
+        if (dataArray) {
+          const slice = Math.floor(dataArray.length / 3);
+          for (let k = i * slice; k < (i + 1) * slice; k++) {
+            avgAmp += dataArray[k] / 255;
+          }
+          avgAmp = avgAmp / slice;
+        }
+        const pulseR = r + (playing ? avgAmp * 12 : Math.sin(now * 0.8 + i) * 4);
+        ctx.beginPath();
+        ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${hue}, 75%, 60%, ${playing ? 0.12 + avgAmp * 0.08 : 0.06})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      // Waveform ring
+      ctx.beginPath();
+      for (let i = 0; i <= POINTS; i++) {
+        const angle = (i / POINTS) * Math.PI * 2 - Math.PI / 2;
+        let amp = 0;
+        if (dataArray && playing) {
+          const idx = Math.floor((i / POINTS) * dataArray.length * 0.5);
+          amp = (dataArray[idx] / 255) * maxAmp;
+        } else {
+          // Idle: gentle sine wave pulse
+          amp = Math.sin(angle * 4 + now * 1.2) * 6 + Math.sin(angle * 7 - now * 0.7) * 3;
+        }
+        const r = baseR + amp;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+
+      // Gradient stroke
+      const grad = ctx.createLinearGradient(cx - baseR, cy, cx + baseR, cy);
+      grad.addColorStop(0,   `hsla(${hue - 20}, 80%, 70%, 0.9)`);
+      grad.addColorStop(0.5, `hsla(${hue},      75%, 65%, 1.0)`);
+      grad.addColorStop(1,   `hsla(${hue + 20}, 70%, 60%, 0.9)`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Core glow
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 0.75);
+      glow.addColorStop(0,   `hsla(${hue}, 80%, 70%, 0.25)`);
+      glow.addColorStop(1,   `hsla(${hue}, 60%, 50%, 0)`);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    frameId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frameId);
+  }, [hue, playing]);
+
   return (
-    <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
+    <canvas
+      ref={canvasRef}
+      width={400}
+      height={400}
+      style={{ width: 220, height: 220 }}
+      aria-hidden
+    />
+  );
+}
+
+// ── Feature D: Music-ready reveal screen ──────────────────────────────────
+// 2-second animated moment between breathe → listen.
+
+function MusicReveal({ theme, onDone }: { theme: SessionTheme; onDone: () => void }) {
+  const orbColor = `hsl(${theme.hue}, 75%, 65%)`;
+
+  useEffect(() => {
+    const t = setTimeout(onDone, 2400);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-30 flex flex-col items-center justify-center"
+      style={{
+        background: `radial-gradient(ellipse 80% 70% at 50% 50%, hsl(${theme.hue}, 40%, 8%) 0%, hsl(0 0% 4%) 70%)`,
+        animation: "reveal-fade 0.5s ease forwards",
+      }}
+    >
+      <style>{`
+        @keyframes reveal-fade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes reveal-ring {
+          0%   { transform: scale(0.7); opacity: 0; }
+          60%  { opacity: 1; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+        @keyframes reveal-text {
+          0%   { opacity: 0; transform: translateY(12px) scale(0.95); }
+          40%  { opacity: 1; transform: translateY(0) scale(1); }
+          80%  { opacity: 1; }
+          100% { opacity: 0; transform: translateY(-6px); }
+        }
+        @keyframes reveal-icon {
+          0%   { opacity: 0; transform: scale(0.5); }
+          50%  { opacity: 1; transform: scale(1.1); }
+          80%  { transform: scale(1); }
+          100% { opacity: 0; }
+        }
+      `}</style>
+
+      {/* Expanding rings */}
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="absolute rounded-full"
+          className="absolute rounded-full border"
           style={{
-            width:  220 - i * 40,
-            height: 220 - i * 40,
-            border: `1.5px solid ${orbColor}`,
-            opacity: playing ? (0.5 - i * 0.12) : (0.18 - i * 0.04),
-            animation: playing ? `ring-pulse ${2.2 + i * 0.6}s ${i * 0.4}s ease-in-out infinite` : "none",
-            transition: "opacity 1s ease",
+            width: 160 + i * 60,
+            height: 160 + i * 60,
+            borderColor: `${orbColor}`,
+            opacity: 0,
+            animation: `reveal-ring 2.4s ${i * 0.25}s ease-out forwards`,
           }}
         />
       ))}
-      {/* Core glow */}
+
+      {/* Icon */}
       <div
-        className="rounded-full flex items-center justify-center"
         style={{
-          width: 100, height: 100,
-          background: `radial-gradient(circle, ${orbColor}44 0%, transparent 70%)`,
-          boxShadow: playing ? `0 0 40px 12px ${orbColor}33` : "none",
-          transition: "box-shadow 1s ease",
+          fontSize: 52,
+          animation: "reveal-icon 2.4s ease forwards",
+          marginBottom: 20,
+          filter: `drop-shadow(0 0 24px ${orbColor})`,
         }}
       >
-        <span className="text-4xl select-none" style={{ filter: playing ? `drop-shadow(0 0 12px ${orbColor})` : "none" }}>
-          🎵
-        </span>
+        {theme.icon}
       </div>
-      <style>{`
-        @keyframes ring-pulse {
-          0%, 100% { transform: scale(1);    opacity: inherit; }
-          50%       { transform: scale(1.07); opacity: 0.8; }
-        }
-      `}</style>
+
+      {/* Text */}
+      <div
+        style={{ animation: "reveal-text 2.4s ease forwards", textAlign: "center" }}
+      >
+        <p
+          className="text-2xl font-bold text-white"
+          style={{ textShadow: `0 0 30px ${orbColor}` }}
+        >
+          Your music is ready
+        </p>
+        <p className="text-sm text-white/40 mt-2">{theme.label}</p>
+      </div>
     </div>
   );
 }
@@ -125,16 +315,17 @@ function VisualizerRings({ hue, playing }: { hue: number; playing: boolean }) {
 
 const STEP_ORDER: Step[] = ["choose", "breathe", "listen", "reflect", "summary"];
 const STEP_LABELS: Record<Step, string> = {
-  choose: "Choose", breathe: "Breathe", listen: "Listen", reflect: "Reflect", summary: "Summary",
+  choose: "Choose", breathe: "Breathe", reveal: "Breathe", listen: "Listen", reflect: "Reflect", summary: "Summary",
 };
 
 function StepIndicator({ current }: { current: Step }) {
-  const currentIdx = STEP_ORDER.indexOf(current);
+  const display = current === "reveal" ? "breathe" : current;
+  const currentIdx = STEP_ORDER.indexOf(display as Step);
   return (
     <div className="flex items-center justify-center gap-1 mb-8">
       {STEP_ORDER.map((s, i) => {
-        const done    = i < currentIdx;
-        const active  = i === currentIdx;
+        const done   = i < currentIdx;
+        const active = i === currentIdx;
         return (
           <div key={s} className="flex items-center gap-1">
             <div className={`flex items-center justify-center rounded-full text-[10px] font-bold transition-all duration-500 ${
@@ -196,25 +387,27 @@ export default function Guided() {
   const [genProgress, setGenProgress] = useState(0);
   const [breathSecondsLeft, setBreathSecondsLeft] = useState(0);
   const [musicReady, setMusicReady]   = useState(false);
+  const [showSurvey, setShowSurvey]   = useState(false);
 
+  // Ref to the <audio> element inside AudioPlayer — used for waveform
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const breathTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── When we enter breathe step: start music gen AND countdown simultaneously ──
+  // ── When we enter breathe step ──────────────────────────────────────────
   useEffect(() => {
     if (step !== "breathe" || !theme) return;
 
     setBreathSecondsLeft(theme.breathDuration);
     setMusicReady(false);
 
-    // Fire music generation immediately — runs in parallel with breathing
     kickOffMusicGeneration();
 
     breathTimerRef.current = setInterval(() => {
       setBreathSecondsLeft(prev => {
         if (prev <= 1) {
           if (breathTimerRef.current) clearInterval(breathTimerRef.current);
-          // Auto-advance to listen — music may already be ready
-          setStep("listen");
+          // Feature D: go to reveal screen first, then listen
+          setStep("reveal");
           return 0;
         }
         return prev - 1;
@@ -245,7 +438,7 @@ export default function Guided() {
 
   const skipBreathing = () => {
     if (breathTimerRef.current) clearInterval(breathTimerRef.current);
-    setStep("listen");
+    setStep("reveal");
   };
 
   const handleReset = () => {
@@ -258,6 +451,8 @@ export default function Guided() {
     setGenProgress(0);
     setGenerating(false);
     setMusicReady(false);
+    setShowSurvey(false);
+    audioRef.current = null;
   };
 
   // ── Step 1: Choose ─────────────────────────────────────────────────────────
@@ -286,7 +481,6 @@ export default function Guided() {
                   : "border-border bg-card hover:border-primary/50 hover:shadow-md"
               }`}
             >
-              {/* Subtle gradient bg */}
               <div className={`absolute inset-0 bg-gradient-to-br ${t.gradient} opacity-${theme?.id === t.id ? "100" : "0 group-hover:opacity-60"} transition-opacity duration-300`} />
               <div className="relative z-10">
                 <span className="text-3xl mb-3 block">{t.icon}</span>
@@ -335,7 +529,7 @@ export default function Guided() {
     );
   }
 
-  // ── Step 2: Breathe (full-screen immersive) ────────────────────────────────
+  // ── Step 2: Breathe (full-screen immersive, Features A + B) ───────────────
   if (step === "breathe" && theme) {
     const minutes = Math.floor(breathSecondsLeft / 60);
     const seconds = breathSecondsLeft % 60;
@@ -343,23 +537,14 @@ export default function Guided() {
 
     return (
       <>
-        {/* Full-screen breathing orb */}
         <BreathingExercise issue={theme.issue} active={true} fullscreen={true} />
 
-        {/* Overlay UI — timer + skip */}
         <div className="fixed inset-x-0 bottom-0 z-20 pb-8 flex flex-col items-center gap-3 pointer-events-none">
-          {/* Music status pill */}
           <div className="pointer-events-auto px-4 py-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs text-white/50 flex items-center gap-2">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${musicReady ? "bg-emerald-400" : "bg-primary animate-pulse"}`}
-            />
+            <span className={`w-1.5 h-1.5 rounded-full ${musicReady ? "bg-emerald-400" : "bg-primary animate-pulse"}`} />
             {musicReady ? "Music ready" : `Composing… ${genProgress}%`}
           </div>
-
-          {/* Timer */}
           <p className="text-white/30 text-sm tabular-nums">{timeStr} remaining</p>
-
-          {/* Skip */}
           <Button
             variant="ghost"
             size="sm"
@@ -373,7 +558,17 @@ export default function Guided() {
     );
   }
 
-  // ── Step 3: Listen ──────────────────────────────────────────────────────────
+  // ── Feature D: Music reveal transition ─────────────────────────────────────
+  if (step === "reveal" && theme) {
+    return (
+      <MusicReveal
+        theme={theme}
+        onDone={() => setStep("listen")}
+      />
+    );
+  }
+
+  // ── Step 3: Listen (Feature C: waveform visualizer) ────────────────────────
   if (step === "listen" && theme) {
     const orbColor = `hsl(${theme.hue}, 75%, 60%)`;
     return (
@@ -383,30 +578,22 @@ export default function Guided() {
       >
         <StepIndicator current="listen" />
 
-        {/* Ambient bg rings */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
-          {[400, 560, 720].map((size, i) => (
-            <div key={i} className="absolute rounded-full" style={{
-              width: size, height: size,
-              border: `1px solid ${orbColor}`,
-              opacity: generating ? 0.04 + i * 0.01 : 0.08 + i * 0.02,
-              animation: `ring-pulse ${5 + i * 1.5}s ${i * 1}s ease-in-out infinite`,
-            }} />
-          ))}
-        </div>
-
         <div className="relative z-10 flex flex-col items-center gap-8 text-center">
           <div className="space-y-2">
             <span className="text-5xl">{theme.icon}</span>
             <h2 className="font-display text-xl font-bold text-white">{theme.label}</h2>
           </div>
 
-          <VisualizerRings hue={theme.hue} playing={!generating && !!trackUrl} />
+          {/* Feature C: waveform replaces pulsing rings when audio is present */}
+          <WaveformVisualizer
+            audioRef={audioRef}
+            hue={theme.hue}
+            playing={!generating && !!trackUrl}
+          />
 
           {generating ? (
             <div className="space-y-3 max-w-xs w-full">
-              <p className="text-sm text-white/60">Composing your track...</p>
-              {/* Animated progress bar */}
+              <p className="text-sm text-white/60">Composing your track…</p>
               <div className="h-0.5 rounded-full bg-white/10 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
@@ -418,10 +605,12 @@ export default function Guided() {
           ) : trackUrl ? (
             <div className="w-full max-w-md space-y-4">
               <p className="text-sm text-white/50">Take your time. Listen fully.</p>
+              {/* AudioPlayer renders an <audio> — we capture its ref via callback */}
               <AudioPlayer
                 audioUrl={trackUrl}
                 trackName={`${theme.label} · ${theme.instrument} · ${theme.tempo} BPM`}
                 loop
+                onAudioRef={(el) => { audioRef.current = el; }}
               />
               <Button
                 onClick={() => setStep("reflect")}
@@ -434,13 +623,6 @@ export default function Guided() {
             </div>
           ) : null}
         </div>
-
-        <style>{`
-          @keyframes ring-pulse {
-            0%, 100% { transform: scale(1);    }
-            50%       { transform: scale(1.04); }
-          }
-        `}</style>
       </div>
     );
   }
@@ -489,11 +671,12 @@ export default function Guided() {
     );
   }
 
-  // ── Step 5: Summary ─────────────────────────────────────────────────────────
+  // ── Step 5: Summary + Feedback survey ─────────────────────────────────────
   if (step === "summary" && theme) {
     const lift = moodAfter - moodBefore;
     const liftLabel = lift > 0 ? `+${lift} better` : lift === 0 ? "Steady" : `${lift} lower`;
     const liftColor = lift > 0 ? "text-primary" : lift < 0 ? "text-destructive" : "text-muted-foreground";
+    const sessionLabel = `${theme.label} · ${theme.instrument} · ${theme.tempo} BPM`;
 
     return (
       <div className="max-w-lg mx-auto px-4 sm:px-6 py-10 space-y-8">
@@ -550,6 +733,31 @@ export default function Guided() {
             </div>
           )}
         </div>
+
+        {/* Feedback survey */}
+        {!showSurvey ? (
+          <div className="rounded-xl border border-border bg-card/60 p-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Help improve this app</p>
+              <p className="text-xs text-muted-foreground mt-0.5">30 seconds · your feedback reaches the developer directly</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-full flex-shrink-0"
+              onClick={() => setShowSurvey(true)}
+            >
+              <MessageSquare className="h-4 w-4" /> Give Feedback
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-primary/20 bg-card p-5">
+            <FeedbackSurvey
+              sessionName={sessionLabel}
+              onClose={() => setShowSurvey(false)}
+            />
+          </div>
+        )}
 
         <div className="flex justify-center">
           <Button

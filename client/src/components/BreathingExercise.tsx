@@ -32,36 +32,29 @@ interface Props {
 
 // ── Dot particle field ────────────────────────────────────────────────────────
 //
-// 80 dots arranged in a circle-ish scatter pattern.
-// On inhale  → dots drift outward (large spread radius)
-// On exhale  → dots drift inward  (small spread radius)
-// On hold    → dots gently shimmer at current radius
+// Dots arranged in a Fibonacci sunflower scatter pattern.
+// On inhale  → dots drift outward
+// On exhale  → dots drift inward
+// ClipPath ensures clean circular containment — no overflow distortion
 
 interface Dot {
   id: number;
-  // base angle in radians — fixed
   angle: number;
-  // base radius multiplier 0..1 — randomises which ring the dot lives in
   radiusFactor: number;
-  // small random size variation
   size: number;
-  // opacity layer so outer dots are fainter
   baseOpacity: number;
-  // individual stagger offset so they don't all move at once
   staggerMs: number;
 }
 
 function buildDots(count: number): Dot[] {
   const dots: Dot[] = [];
   for (let i = 0; i < count; i++) {
-    // Fibonacci sunflower angle for natural scatter
-    const goldenAngle = 2.399963; // radians  (137.5°)
+    const goldenAngle = 2.399963; // 137.5°
     const angle = i * goldenAngle;
-    // radius grows with sqrt(i) for even density, then normalised to 0..1
     const radiusFactor = 0.25 + 0.75 * Math.sqrt(i / count);
     const size = 3 + ((i * 17 + 7) % 5) * 1.2;
-    const baseOpacity = 0.35 + 0.55 * (1 - radiusFactor * 0.6); // inner = brighter
-    const staggerMs = (i * 12) % 320; // stagger 0–320ms across dots
+    const baseOpacity = 0.35 + 0.55 * (1 - radiusFactor * 0.6);
+    const staggerMs = (i * 12) % 320;
     dots.push({ id: i, angle, radiusFactor, size, baseOpacity, staggerMs });
   }
   return dots;
@@ -75,11 +68,12 @@ const COMPACT_DOTS = buildDots(36);
 function DotField({
   phase,
   hue,
-  phaseDuration, // seconds
-  containerSize, // px — square
+  phaseDuration,
+  containerSize,
   minRadius,
   maxRadius,
   dots,
+  clipId,
 }: {
   phase: Phase;
   hue: number;
@@ -88,21 +82,21 @@ function DotField({
   minRadius: number;
   maxRadius: number;
   dots: Dot[];
+  clipId: string;
 }) {
   const cx = containerSize / 2;
   const cy = containerSize / 2;
+  const clipR = maxRadius + 8; // clip circle is slightly bigger than max spread
 
-  // Target radius for each phase
   const targetR = (phase === "inhale" || phase === "hold") ? maxRadius : minRadius;
 
-  const col = `hsl(${hue}, 78%, 68%)`;
+  const col    = `hsl(${hue}, 78%, 68%)`;
   const colDim = `hsl(${hue}, 60%, 50%)`;
 
-  // Easing: inhale = ease-out (fast open), exhale = ease-in (slow close then release)
   const easingMap: Record<Phase, string> = {
-    inhale:  "cubic-bezier(0.2, 0, 0.4, 1)",   // quick bloom
+    inhale:  "cubic-bezier(0.2, 0, 0.4, 1)",
     hold:    "ease-in-out",
-    exhale:  "cubic-bezier(0.6, 0, 0.8, 1)",   // slow graceful draw-in
+    exhale:  "cubic-bezier(0.6, 0, 0.8, 1)",
     holdOut: "ease-in-out",
   };
   const easing = easingMap[phase];
@@ -111,37 +105,123 @@ function DotField({
     <svg
       width={containerSize}
       height={containerSize}
-      style={{ overflow: "visible", display: "block" }}
+      style={{ overflow: "hidden", display: "block" }}
       aria-hidden
     >
-      {dots.map((dot) => {
-        const r = targetR * dot.radiusFactor;
-        const x = cx + Math.cos(dot.angle) * r;
-        const y = cy + Math.sin(dot.angle) * r;
-        const opacity = dot.baseOpacity * (phase === "hold" || phase === "holdOut" ? 0.75 : 1);
-        // Scale dot itself: bigger at full inhale, smaller at exhale
-        const dotScale = phase === "inhale" || phase === "hold"
-          ? 0.85 + 0.15 * dot.radiusFactor
-          : 0.6 + 0.15 * dot.radiusFactor;
+      <defs>
+        <clipPath id={clipId}>
+          <circle cx={cx} cy={cy} r={clipR} />
+        </clipPath>
+      </defs>
 
-        return (
-          <circle
-            key={dot.id}
-            cx={x}
-            cy={y}
-            r={dot.size * dotScale / 2}
-            fill={dot.radiusFactor > 0.6 ? colDim : col}
-            opacity={opacity}
-            style={{
-              transition: `cx ${phaseDuration}s ${easing} ${dot.staggerMs}ms,
-                           cy ${phaseDuration}s ${easing} ${dot.staggerMs}ms,
-                           r  ${phaseDuration}s ${easing} ${dot.staggerMs}ms,
-                           opacity ${phaseDuration * 0.4}s ease`,
-            }}
-          />
-        );
-      })}
+      <g clipPath={`url(#${clipId})`}>
+        {dots.map((dot) => {
+          const r = targetR * dot.radiusFactor;
+          const x = cx + Math.cos(dot.angle) * r;
+          const y = cy + Math.sin(dot.angle) * r;
+          const opacity = dot.baseOpacity * (phase === "hold" || phase === "holdOut" ? 0.75 : 1);
+          const dotScale = phase === "inhale" || phase === "hold"
+            ? 0.85 + 0.15 * dot.radiusFactor
+            : 0.6 + 0.15 * dot.radiusFactor;
+
+          return (
+            <circle
+              key={dot.id}
+              cx={x}
+              cy={y}
+              r={dot.size * dotScale / 2}
+              fill={dot.radiusFactor > 0.6 ? colDim : col}
+              opacity={opacity}
+              style={{
+                transition: `cx ${phaseDuration}s ${easing} ${dot.staggerMs}ms,
+                             cy ${phaseDuration}s ${easing} ${dot.staggerMs}ms,
+                             r  ${phaseDuration}s ${easing} ${dot.staggerMs}ms,
+                             opacity ${phaseDuration * 0.4}s ease`,
+              }}
+            />
+          );
+        })}
+      </g>
     </svg>
+  );
+}
+
+// ── Ambient word drift (Feature A) ────────────────────────────────────────────
+// Slow-moving intention words that drift upward very faintly behind the dots.
+
+const THEME_WORDS: Record<string, string[]> = {
+  anxiety:      ["release", "soften", "settle", "calm", "let go", "ease", "still", "breathe"],
+  stress:       ["release", "reset", "ground", "exhale", "steady", "center", "clear", "ease"],
+  depression:   ["open", "rise", "warmth", "light", "lift", "here", "enough", "present"],
+  sleep:        ["drift", "rest", "slow", "quiet", "dim", "soft", "float", "surrender"],
+  relationship: ["together", "sync", "rhythm", "heart", "open", "listen", "feel", "attune"],
+};
+const DEFAULT_WORDS = ["breathe", "release", "calm", "open", "soften", "still"];
+
+interface WordParticle {
+  id: number;
+  word: string;
+  x: number; // percent
+  startY: number; // percent from bottom
+  duration: number; // seconds
+  delay: number;
+  opacity: number;
+  fontSize: number;
+}
+
+function buildWordParticles(words: string[], count: number): WordParticle[] {
+  const result: WordParticle[] = [];
+  for (let i = 0; i < count; i++) {
+    result.push({
+      id: i,
+      word: words[i % words.length],
+      x: 8 + ((i * 37 + 13) % 84), // 8–92% horizontal spread
+      startY: 100 + ((i * 23) % 40), // start slightly below viewport
+      duration: 18 + ((i * 7) % 14), // 18–32s each
+      delay: -(i * 3.2) % 30, // stagger starts so some are mid-float on mount
+      opacity: 0.045 + ((i * 0.007) % 0.04), // very faint: 4–8%
+      fontSize: 11 + ((i * 3) % 8), // 11–18px
+    });
+  }
+  return result;
+}
+
+function WordDrift({ issue }: { issue?: string }) {
+  const words = issue ? (THEME_WORDS[issue] ?? DEFAULT_WORDS) : DEFAULT_WORDS;
+  const particles = useMemo(() => buildWordParticles(words, 16), [issue]);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+      <style>{`
+        @keyframes word-float {
+          0%   { transform: translateY(0);    opacity: 0; }
+          8%   { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { transform: translateY(-110vh); opacity: 0; }
+        }
+      `}</style>
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          style={{
+            position: "absolute",
+            left: `${p.x}%`,
+            bottom: `${p.startY - 100}%`,
+            fontSize: p.fontSize,
+            color: "white",
+            fontWeight: 300,
+            letterSpacing: "0.15em",
+            textTransform: "lowercase",
+            animation: `word-float ${p.duration}s ${p.delay}s linear infinite`,
+            opacity: p.opacity,
+            userSelect: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {p.word}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -150,9 +230,9 @@ function DotField({
 export function BreathingExercise({ issue, active, fullscreen = false }: Props) {
   const pattern = (issue && PATTERNS[issue]) ? PATTERNS[issue] : DEFAULT_PATTERN;
 
-  const [phase, setPhase]           = useState<Phase>("inhale");
+  const [phase, setPhase]            = useState<Phase>("inhale");
   const [secondsLeft, setSecondsLeft] = useState(pattern.inhale);
-  const [cycleCount, setCycleCount] = useState(0);
+  const [cycleCount, setCycleCount]  = useState(0);
 
   const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeRef = useRef(active);
@@ -205,11 +285,11 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
   const phaseDur = getDuration(phase);
   const orbColor = `hsl(${pattern.hue}, 78%, 62%)`;
 
-  const phaseConfig: Record<Phase, { label: string; instruction: string; bgAlpha: string }> = {
-    inhale:  { label: "Breathe In",  instruction: "Let your lungs fill completely",   bgAlpha: `hsla(${pattern.hue}, 80%, 55%, 0.18)` },
-    hold:    { label: "Hold",        instruction: "Stay still — feel the fullness",   bgAlpha: `hsla(${pattern.hue}, 60%, 45%, 0.12)` },
-    exhale:  { label: "Breathe Out", instruction: "Release everything slowly",        bgAlpha: `hsla(${pattern.hue + 25}, 65%, 40%, 0.15)` },
-    holdOut: { label: "Hold",        instruction: "Rest here a moment",               bgAlpha: `hsla(${pattern.hue + 25}, 55%, 35%, 0.09)` },
+  const phaseConfig: Record<Phase, { label: string; instruction: string; bgAlpha: string; hueShift: number }> = {
+    inhale:  { label: "Breathe In",  instruction: "Let your lungs fill completely",   bgAlpha: `hsla(${pattern.hue}, 80%, 55%, 0.22)`,      hueShift: 0 },
+    hold:    { label: "Hold",        instruction: "Stay still — feel the fullness",   bgAlpha: `hsla(${pattern.hue}, 60%, 45%, 0.16)`,      hueShift: 5 },
+    exhale:  { label: "Breathe Out", instruction: "Release everything slowly",        bgAlpha: `hsla(${pattern.hue + 25}, 65%, 35%, 0.18)`, hueShift: 25 },
+    holdOut: { label: "Hold",        instruction: "Rest here a moment",               bgAlpha: `hsla(${pattern.hue + 30}, 55%, 30%, 0.12)`, hueShift: 30 },
   };
 
   const cfg = phaseConfig[phase];
@@ -224,36 +304,33 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
   // ── Fullscreen ───────────────────────────────────────────────────────────────
 
   if (fullscreen) {
-    const SIZE = 320;     // svg canvas
-    const MAX_R = 140;    // dots at full inhale
-    const MIN_R = 58;     // dots at full exhale
+    const SIZE  = 320;
+    const MAX_R = 140;
+    const MIN_R = 58;
+
+    // Feature B: the whole background hue shifts gently with each phase
+    const bgHue = pattern.hue + cfg.hueShift;
+    const isExpanded = phase === "inhale" || phase === "hold";
 
     return (
       <div
         className="fixed inset-0 z-10 flex flex-col items-center justify-center overflow-hidden select-none"
-        style={{ background: "hsl(0 0% 4%)" }}
+        style={{
+          background: `hsl(${bgHue}, 12%, 5%)`,
+          transition: `background ${phaseDur}s ease`,
+        }}
       >
-        {/* Animated CSS for background glow */}
         <style>{`
-          @keyframes bg-breathe-in {
-            from { opacity: 0.5; }
-            to   { opacity: 1;   }
-          }
-          @keyframes bg-breathe-out {
-            from { opacity: 1;   }
-            to   { opacity: 0.5; }
-          }
           @keyframes text-fade {
-            from { opacity: 0; transform: translateY(5px); }
+            from { opacity: 0; transform: translateY(6px); }
             to   { opacity: 1; transform: translateY(0);   }
-          }
-          @keyframes hold-shimmer {
-            0%, 100% { opacity: 0.82; }
-            50%      { opacity: 1;    }
           }
         `}</style>
 
-        {/* Ambient radial background — shifts with phase */}
+        {/* Feature A: ambient word drift */}
+        <WordDrift issue={issue} />
+
+        {/* Feature B: animated radial glow — shifts color with phase */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -271,25 +348,19 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
         {/* ── DOT FIELD ── */}
         <div className="relative flex items-center justify-center" style={{ width: SIZE, height: SIZE }}>
 
-          {/* Faint core glow behind the dots */}
+          {/* Core glow — breathes with phase */}
           <div
             className="absolute rounded-full pointer-events-none"
             style={{
-              width: MIN_R * 2,
-              height: MIN_R * 2,
-              background: `radial-gradient(circle, ${orbColor}28 0%, transparent 70%)`,
-              boxShadow: `0 0 60px 20px ${orbColor}18`,
-              transition: `box-shadow ${phaseDur}s ease, width ${phaseDur}s ease, height ${phaseDur}s ease`,
-              ...(phase === "inhale" || phase === "hold" ? {
-                width: MAX_R * 2,
-                height: MAX_R * 2,
-                background: `radial-gradient(circle, ${orbColor}1a 0%, transparent 65%)`,
-                boxShadow: `0 0 90px 35px ${orbColor}22`,
-              } : {}),
+              width:  isExpanded ? MAX_R * 2 : MIN_R * 2,
+              height: isExpanded ? MAX_R * 2 : MIN_R * 2,
+              background: `radial-gradient(circle, ${orbColor}${isExpanded ? "1a" : "28"} 0%, transparent 65%)`,
+              boxShadow: `0 0 ${isExpanded ? "90px 35px" : "60px 20px"} ${orbColor}${isExpanded ? "22" : "18"}`,
+              transition: `width ${phaseDur}s ease, height ${phaseDur}s ease, box-shadow ${phaseDur}s ease`,
             }}
           />
 
-          {/* The dot field itself */}
+          {/* The dot field */}
           <div className="absolute inset-0">
             <DotField
               phase={phase}
@@ -299,10 +370,11 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
               minRadius={MIN_R}
               maxRadius={MAX_R}
               dots={DOTS}
+              clipId="fullscreen-dots-clip"
             />
           </div>
 
-          {/* Center timer pill — sits on top of dots */}
+          {/* Center timer pill */}
           <div
             className="relative z-10 flex flex-col items-center justify-center"
             style={{
@@ -338,7 +410,7 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
           <p className="text-[13px] text-white/40">{cfg.instruction}</p>
         </div>
 
-        {/* Phase progress bar */}
+        {/* Phase progress dots */}
         <div className="mt-7 flex items-center gap-2">
           {phaseList.map(p => (
             <div
@@ -365,9 +437,9 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
 
   // ── Compact variant (Assessment / Presets) ────────────────────────────────
 
-  const C_SIZE = 180;
-  const C_MAX = 78;
-  const C_MIN = 32;
+  const C_SIZE = 200;
+  const C_MAX  = 88;
+  const C_MIN  = 36;
 
   return (
     <div className="flex flex-col items-center justify-center py-6 space-y-5">
@@ -376,8 +448,8 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
         <p className="text-xs text-muted-foreground">{pattern.tagline}</p>
       </div>
 
+      {/* Compact dot field — clipped to a tidy circle */}
       <div className="relative flex items-center justify-center" style={{ width: C_SIZE, height: C_SIZE }}>
-        {/* Compact dot field */}
         <DotField
           phase={phase}
           hue={pattern.hue}
@@ -386,15 +458,16 @@ export function BreathingExercise({ issue, active, fullscreen = false }: Props) 
           minRadius={C_MIN}
           maxRadius={C_MAX}
           dots={COMPACT_DOTS}
+          clipId="compact-dots-clip"
         />
 
         {/* Center timer */}
         <div
           className="absolute z-10 flex flex-col items-center justify-center"
           style={{
-            width: 52,
-            height: 52,
-            borderRadius: 26,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
             background: "hsl(var(--primary) / 0.18)",
             border: "1.5px solid hsl(var(--primary) / 0.4)",
           }}

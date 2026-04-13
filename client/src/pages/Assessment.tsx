@@ -229,61 +229,7 @@ export default function Assessment() {
     }
   };
 
-  const handleSaveMoodAfter = async () => {
-    const note = selectedIssue
-      ? `After ${selectedIssue} session — ${selectedInstrument ?? ""} at ${tempo} BPM`
-      : "Music session";
-    const tags = JSON.stringify(["music-session", selectedIssue ?? ""].filter(Boolean));
-
-    if (user) {
-      // Save to backend when logged in
-      try {
-        await apiRequest("POST", "/api/journal", {
-          userId: user.id,
-          mood: moodAfter,
-          energy: 3,
-          note,
-          tags,
-        });
-        toast({ title: "Saved to Journal ✓", description: `Mood after: ${moodAfter}/5 · synced to account` });
-      } catch {
-        toast({ title: "Could not save", variant: "destructive" });
-      }
-    } else {
-      // Local-only fallback
-      try {
-        const LS_JOURNAL = "mm_journal_v1";
-        const existing = JSON.parse(localStorage.getItem(LS_JOURNAL) ?? "[]");
-        const newEntry = {
-          id: Date.now(),
-          mood: moodAfter,
-          energy: 3,
-          note,
-          tags,
-          createdAt: new Date().toISOString(),
-        };
-        localStorage.setItem(LS_JOURNAL, JSON.stringify([newEntry, ...existing]));
-        toast({ title: "Saved to Journal ✓", description: `Mood after: ${moodAfter}/5` });
-      } catch {
-        toast({ title: "Could not save", variant: "destructive" });
-      }
-    }
-
-    // Update moodAfter in localStorage session
-    try {
-      const LS_SESSIONS = "mm_sessions_v1";
-      const sessions = JSON.parse(localStorage.getItem(LS_SESSIONS) ?? "[]");
-      const updated = sessions.map((s: any) =>
-        s.id === sessionId ? { ...s, moodAfter } : s
-      );
-      localStorage.setItem(LS_SESSIONS, JSON.stringify(updated));
-    } catch {}
-
-    // Also try backend (non-critical)
-    if (sessionId) {
-      try { await apiRequest("PATCH", `/api/sessions/${sessionId}/mood-after`, { moodAfter }); } catch {}
-    }
-  };
+  // Mood after is tracked locally for session context only — no journal storage
 
   const handleReset = () => {
     reset();
@@ -592,12 +538,7 @@ export default function Assessment() {
               />
               <span className="text-lg font-semibold text-primary w-6 text-center tabular-nums">{moodAfter}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">1 = no change or worse, 5 = significantly better</p>
-              <Button size="sm" variant="outline" onClick={handleSaveMoodAfter} className="text-xs gap-1">
-                Save to Journal
-              </Button>
-            </div>
+            <p className="text-xs text-muted-foreground">1 = no change or worse, 5 = significantly better</p>
           </CardContent>
         </Card>
 

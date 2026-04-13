@@ -27,9 +27,8 @@ export default function Privacy() {
           <h2 className="font-display text-xl font-medium text-foreground">2. Data we collect</h2>
           <ul className="list-disc pl-5 space-y-2">
             <li><strong className="text-foreground">Assessment responses:</strong> Slider scores (0–4) for 5 wellness questions and your selected issue area, instrument, and tempo. These are used only to build the music generation prompt.</li>
-            <li><strong className="text-foreground">Mood ratings:</strong> Optional before/after mood scores (1–5) you provide after listening. Stored to power your mood journal history.</li>
-            <li><strong className="text-foreground">Journal entries:</strong> Mood, energy, tags, and notes you choose to log. Stored in the application database.</li>
-            <li><strong className="text-foreground">Session metadata:</strong> Timestamp, issue type, instrument, tempo, and the text prompt sent to Lyria. No audio is stored — the audio blob lives only in your browser memory for the current session.</li>
+            <li><strong className="text-foreground">Mood ratings:</strong> Optional before/after mood scores (1–5) you provide during a session. These stay in your browser for the duration of your session only and are not persisted.</li>
+            <li><strong className="text-foreground">Session metadata:</strong> Issue type, instrument, and tempo used to build the music prompt. No audio is stored — the audio blob lives only in your browser memory for the current session.</li>
           </ul>
         </section>
 
@@ -60,7 +59,7 @@ export default function Privacy() {
 
         <section className="space-y-3">
           <h2 className="font-display text-xl font-medium text-foreground">6. Your rights</h2>
-          <p>You may delete any journal entry at any time from the Journal page. If you wish to request deletion of all session data, contact the project maintainer via the GitHub repository.</p>
+          <p>Because we do not persist your data beyond your session, there is nothing stored to delete. If you have questions about data handling, contact the project maintainer via the GitHub repository.</p>
         </section>
 
         <section className="space-y-3">
