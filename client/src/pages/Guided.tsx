@@ -3,7 +3,6 @@ import { generateMusic } from "@/services/lyria";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BreathingExercise } from "@/components/BreathingExercise";
 import { FeedbackSurvey } from "@/components/FeedbackSurvey";
-import { SessionSummaryCard } from "@/components/SessionSummaryCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -615,19 +614,6 @@ export default function Guided() {
               <p className="text-sm text-foreground leading-relaxed italic">"{reflection.trim()}"</p>
             </div>
           )}
-        </div>
-
-        {/* Session summary card — saveable PNG */}
-        <div className="rounded-xl border border-border bg-card/60 p-5">
-          <SessionSummaryCard
-            sessionName={theme.label}
-            icon={theme.icon}
-            instrument={theme.instrument}
-            tempo={theme.tempo}
-            hue={theme.hue}
-            moodBefore={moodBefore}
-            moodAfter={moodAfter}
-          />
         </div>
 
         {/* Feedback survey */}

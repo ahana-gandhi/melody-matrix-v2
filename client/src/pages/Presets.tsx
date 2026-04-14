@@ -3,7 +3,6 @@ import { generateMusic } from "@/services/lyria";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BreathingExercise } from "@/components/BreathingExercise";
 import { FeedbackSurvey } from "@/components/FeedbackSurvey";
-import { SessionSummaryCard } from "@/components/SessionSummaryCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -173,11 +172,6 @@ export default function Presets() {
     }
   };
 
-  // Issue → hue map for the summary card gradient
-  const ISSUE_HUES: Record<Issue, number> = {
-    anxiety: 270, depression: 310, stress: 200, relationship: 340, sleep: 230,
-  };
-
   const handleBack = () => {
     setActivePreset(null);
     setTrackUrl(null);
@@ -248,17 +242,6 @@ export default function Presets() {
         {trackUrl && (
           <div className="space-y-6">
             <AudioPlayer audioUrl={trackUrl} trackName={`${activePreset.name} · ${activePreset.instrument} · ${activePreset.tempo} BPM`} />
-
-            {/* Session summary card */}
-            <div className="rounded-xl border border-border bg-card/60 p-5">
-              <SessionSummaryCard
-                sessionName={activePreset.name}
-                icon={activePreset.icon}
-                instrument={activePreset.instrument}
-                tempo={activePreset.tempo}
-                hue={ISSUE_HUES[activePreset.issue] ?? 262}
-              />
-            </div>
 
             {/* Feedback survey */}
             {!showSurvey ? (
