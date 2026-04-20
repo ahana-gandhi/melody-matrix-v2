@@ -11,6 +11,7 @@ import Privacy from "@/pages/Privacy";
 import Presets from "@/pages/Presets";
 import Guided from "@/pages/Guided";
 import NotFound from "@/pages/NotFound";
+import { Analytics } from "@vercel/analytics/react";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
         </Layout>
       </Router>
       <Toaster />
+      <Analytics />
     </QueryClientProvider>
   );
 }
