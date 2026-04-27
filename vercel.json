@@ -3,7 +3,12 @@
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "framework": null,
+  "functions": {
+    "dist/index.cjs": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/dist/index.cjs" }
   ]
 }
